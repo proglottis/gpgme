@@ -204,7 +204,7 @@ func skipGPG2x(t *testing.T, msg string) {
 	info, err := GetEngineInfo()
 	checkError(t, err)
 	for info != nil {
-		if strings.HasSuffix(info.FileName(), "gpg") && strings.HasPrefix(info.Version(), "2.") {
+		if strings.Contains(info.FileName(), "gpg") && strings.HasPrefix(info.Version(), "2.") {
 			t.Skip(msg)
 		}
 		info = info.Next()
