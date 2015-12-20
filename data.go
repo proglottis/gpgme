@@ -16,20 +16,26 @@ import (
 //export gogpgme_readfunc
 func gogpgme_readfunc(handle, buffer unsafe.Pointer, size C.size_t) C.ssize_t {
 	d := callbackLookup(*(*int)(handle)).(*Data)
-	buf := make([]byte, size)
-	n, err := d.r.Read(buf)
+	if len(d.buf) < int(size) {
+		d.buf = make([]byte, size)
+	}
+	n, err := d.r.Read(d.buf[:size])
 	if err != nil && err != io.EOF {
 		C.gpgme_err_set_errno(C.EIO)
 		return -1
 	}
-	C.memcpy(buffer, unsafe.Pointer(&buf[0]), C.size_t(n))
+	C.memcpy(buffer, unsafe.Pointer(&d.buf[0]), C.size_t(n))
 	return C.ssize_t(n)
 }
 
 //export gogpgme_writefunc
 func gogpgme_writefunc(handle, buffer unsafe.Pointer, size C.size_t) C.ssize_t {
 	d := callbackLookup(*(*int)(handle)).(*Data)
-	n, err := d.w.Write(C.GoBytes(buffer, C.int(size)))
+	if len(d.buf) < int(size) {
+		d.buf = make([]byte, size)
+	}
+	C.memcpy(unsafe.Pointer(&d.buf[0]), buffer, C.size_t(size))
+	n, err := d.w.Write(d.buf[:size])
 	if err != nil && err != io.EOF {
 		C.gpgme_err_set_errno(C.EIO)
 		return -1
@@ -51,6 +57,7 @@ func gogpgme_seekfunc(handle unsafe.Pointer, offset C.off_t, whence C.int) C.off
 // The Data buffer used to communicate with GPGME
 type Data struct {
 	dh  C.gpgme_data_t
+	buf []byte
 	cbs C.struct_gpgme_data_cbs
 	r   io.Reader
 	w   io.Writer
