@@ -245,6 +245,14 @@ func (c *Context) Armor() bool {
 	return C.gpgme_get_armor(c.ctx) != 0
 }
 
+func (c *Context) SetTextMode(yes bool) {
+	C.gpgme_set_textmode(c.ctx, cbool(yes))
+}
+
+func (c *Context) TextMode() bool {
+	return C.gpgme_get_textmode(c.ctx) != 0
+}
+
 func (c *Context) SetProtocol(p Protocol) error {
 	return handleError(C.gpgme_set_protocol(c.ctx, C.gpgme_protocol_t(p)))
 }

@@ -66,6 +66,20 @@ func TestContext_Armor(t *testing.T) {
 	}
 }
 
+func TestContext_TextMode(t *testing.T) {
+	ctx, err := New()
+	checkError(t, err)
+
+	ctx.SetTextMode(true)
+	if !ctx.TextMode() {
+		t.Error("expected textmode set")
+	}
+	ctx.SetTextMode(false)
+	if ctx.TextMode() {
+		t.Error("expected textmode not set")
+	}
+}
+
 func TestContext_Encrypt(t *testing.T) {
 	ctx, err := New()
 	checkError(t, err)
