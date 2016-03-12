@@ -71,6 +71,10 @@ const (
 	EncryptNoCompress              = C.GPGME_ENCRYPT_NO_COMPRESS
 )
 
+type HashAlgo int
+
+// const values for HashAlgo values should be added when necessary.
+
 type KeyListMode uint
 
 const (
@@ -81,6 +85,34 @@ const (
 	KeyListModeWithSecret               = C.GPGME_KEYLIST_MODE_WITH_SECRET
 	KeyListModeEphemeral                = C.GPGME_KEYLIST_MODE_EPHEMERAL
 	KeyListModeModeValidate             = C.GPGME_KEYLIST_MODE_VALIDATE
+)
+
+type PubkeyAlgo int
+
+// const values for PubkeyAlgo values should be added when necessary.
+
+type SigMode int
+
+const (
+	SigModeNormal SigMode = C.GPGME_SIG_MODE_NORMAL
+	SigModeDetach         = C.GPGME_SIG_MODE_DETACH
+	SigModeClear          = C.GPGME_SIG_MODE_CLEAR
+)
+
+type SigSum int
+
+const (
+	SigSumValid      SigSum = C.GPGME_SIGSUM_VALID
+	SigSumGreen             = C.GPGME_SIGSUM_GREEN
+	SigSumRed               = C.GPGME_SIGSUM_RED
+	SigSumKeyRevoked        = C.GPGME_SIGSUM_KEY_REVOKED
+	SigSumKeyExpired        = C.GPGME_SIGSUM_KEY_EXPIRED
+	SigSumSigExpired        = C.GPGME_SIGSUM_SIG_EXPIRED
+	SigSumKeyMissing        = C.GPGME_SIGSUM_KEY_MISSING
+	SigSumCRLMissing        = C.GPGME_SIGSUM_CRL_MISSING
+	SigSumCRLTooOld         = C.GPGME_SIGSUM_CRL_TOO_OLD
+	SigSumBadPolicy         = C.GPGME_SIGSUM_BAD_POLICY
+	SigSumSysError          = C.GPGME_SIGSUM_SYS_ERROR
 )
 
 type Validity int
@@ -167,6 +199,13 @@ func (e *EngineInfo) HomeDir() string {
 func GetEngineInfo() (*EngineInfo, error) {
 	info := &EngineInfo{}
 	return info, handleError(C.gpgme_get_engine_info(&info.info))
+}
+
+func (c *Context) GetKey(fingerprint string, secret bool) (*Key, error) {
+	key := newKey()
+	cfpr := C.CString(fingerprint)
+	defer C.free(unsafe.Pointer(cfpr))
+	return key, handleError(C.gpgme_get_key(c.ctx, cfpr, &key.k, cbool(secret)))
 }
 
 func FindKeys(pattern string, secretOnly bool) ([]*Key, error) {
@@ -332,6 +371,56 @@ func (c *Context) DecryptVerify(ciphertext, plaintext *Data) error {
 	return handleError(C.gpgme_op_decrypt_verify(c.ctx, ciphertext.dh, plaintext.dh))
 }
 
+type Signature struct {
+	Summary        SigSum
+	Fingerprint    string
+	Status         error
+	Timestamp      time.Time
+	ExpTimestamp   time.Time
+	WrongKeyUsage  bool
+	PKATrust       uint
+	ChainModel     bool
+	Validity       Validity
+	ValidityReason error
+	PubkeyAlgo     PubkeyAlgo
+	HashAlgo       HashAlgo
+}
+
+func (c *Context) Verify(sig, signedText, plain *Data) (string, []Signature, error) {
+	var signedTextPtr, plainPtr C.gpgme_data_t = nil, nil
+	if signedText != nil {
+		signedTextPtr = signedText.dh
+	}
+	if plain != nil {
+		plainPtr = plain.dh
+	}
+	err := handleError(C.gpgme_op_verify(c.ctx, sig.dh, signedTextPtr, plainPtr))
+	if err != nil {
+		return "", nil, err
+	}
+	res := C.gpgme_op_verify_result(c.ctx)
+	sigs := []Signature{}
+	for s := res.signatures; s != nil; s = s.next {
+		sig := Signature{
+			Summary:     SigSum(s.summary),
+			Fingerprint: C.GoString(s.fpr),
+			Status:      handleError(s.status),
+			// s.notations not implemented
+			Timestamp:      time.Unix(int64(s.timestamp), 0),
+			ExpTimestamp:   time.Unix(int64(s.exp_timestamp), 0),
+			WrongKeyUsage:  C.signature_wrong_key_usage(s) != 0,
+			PKATrust:       uint(C.signature_pka_trust(s)),
+			ChainModel:     C.signature_chain_model(s) != 0,
+			Validity:       Validity(s.validity),
+			ValidityReason: handleError(s.validity_reason),
+			PubkeyAlgo:     PubkeyAlgo(s.pubkey_algo),
+			HashAlgo:       HashAlgo(s.hash_algo),
+		}
+		sigs = append(sigs, sig)
+	}
+	return C.GoString(res.file_name), sigs, nil
+}
+
 func (c *Context) Encrypt(recipients []*Key, flags EncryptFlag, plaintext, ciphertext *Data) error {
 	size := unsafe.Sizeof(new(C.gpgme_key_t))
 	recp := C.calloc(C.size_t(len(recipients)+1), C.size_t(size))
@@ -342,6 +431,17 @@ func (c *Context) Encrypt(recipients []*Key, flags EncryptFlag, plaintext, ciphe
 	}
 	err := C.gpgme_op_encrypt(c.ctx, (*C.gpgme_key_t)(recp), C.gpgme_encrypt_flags_t(flags), plaintext.dh, ciphertext.dh)
 	return handleError(err)
+}
+
+func (c *Context) Sign(signers []*Key, plain, sig *Data, mode SigMode) error {
+	C.gpgme_signers_clear(c.ctx)
+	for _, k := range signers {
+		if err := handleError(C.gpgme_signers_add(c.ctx, k.k)); err != nil {
+			C.gpgme_signers_clear(c.ctx)
+			return err
+		}
+	}
+	return handleError(C.gpgme_op_sign(c.ctx, plain.dh, sig.dh, C.gpgme_sig_mode_t(mode)))
 }
 
 type Key struct {

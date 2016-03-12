@@ -44,6 +44,19 @@ D4jgGAEpFU+mpPH8eukKuT+OJ3P6gdmSiAJH7+C96tlcEg9BNxjYNkCTil/3yygQ
 EV/5zFTEpzm4CtYHHdmY5uCaEJq/4hhE8BY8
 =8mxI
 -----END PGP MESSAGE-----`
+	testSignedText = `-----BEGIN PGP MESSAGE-----
+Version: GnuPG v1
+
+owEBQwG8/pANAwACAQMn/7Ain2E2AcsTYgBW47+PVGVzdCBtZXNzYWdlCokBHAQA
+AQIABgUCVuO/jwAKCRADJ/+wIp9hNh9lCACPiDkY0CqI9ss4EBcpToqnF/8NmV99
+2wi6FmbQnUmY98OMM2VJXrX6PvfD/X+FsiLog0CZU4heMEAI3Dd3qELgTfaTFqNc
+bbDkenzA0kO734WLsEU/z1F9iWAcfeF3crKqd3fBw5kZ1PkhuJFdcqQEOUQALvXY
+8VAtQmQWzf3sn2KIQ7R1wyAJVoUZaN5Xwc9Y0F1l4Xxifax8nkFBl35X6gmHRxZ7
+jlfmWMcAkXASNXl9/Yso2XGJMs85JPhZPJ3KJRuuurnhZSxAbDJMNBFJ+HbQv3y6
+pupeR7ut6pWJxr6MND793yoFGoRYwKklQdfP4xzFCatYRU4RkPBp95KJ
+=RMUj
+-----END PGP MESSAGE-----
+`
 )
 
 func TestMain(m *testing.M) {
@@ -137,6 +150,68 @@ func TestContext_DecryptVerify(t *testing.T) {
 	plain, err := NewDataWriter(&buf)
 	checkError(t, err)
 	checkError(t, ctx.DecryptVerify(cipher, plain))
+	diff(t, buf.Bytes(), []byte("Test message\n"))
+}
+
+func TestContext_Sign(t *testing.T) {
+	ctx := ctxWithCallback(t)
+
+	key, err := ctx.GetKey("test@example.com", true)
+	checkError(t, err)
+
+	plain, err := NewDataBytes([]byte(testData))
+	checkError(t, err)
+
+	var buf bytes.Buffer
+	signed, err := NewDataWriter(&buf)
+	checkError(t, err)
+
+	checkError(t, ctx.Sign([]*Key{key}, plain, signed, SigModeNormal))
+	if buf.Len() < 1 {
+		t.Error("Expected signed bytes, got empty buffer")
+	}
+}
+
+func TestContext_Verify(t *testing.T) {
+	ctx, err := New()
+	checkError(t, err)
+
+	_, err = ctx.GetKey("test@example.com", false)
+	checkError(t, err)
+
+	signed, err := NewDataBytes([]byte(testSignedText))
+	checkError(t, err)
+
+	var buf bytes.Buffer
+	plain, err := NewDataWriter(&buf)
+	checkError(t, err)
+
+	_, sigs, err := ctx.Verify(signed, nil, plain)
+	checkError(t, err)
+
+	if len(sigs) != 1 {
+		t.Error("Expected 1 signature")
+	}
+	sig := sigs[0]
+	// Normalize
+	expectedSig := Signature{
+		Summary:        SigSumValid | SigSumGreen,
+		Fingerprint:    "44B646DC347C31E867FF4F450327FFB0229F6136",
+		Status:         nil,
+		Timestamp:      sig.Timestamp,    // Ignore in comparison
+		ExpTimestamp:   sig.ExpTimestamp, // Ignore in comparison
+		WrongKeyUsage:  false,
+		PKATrust:       0,
+		ChainModel:     false,
+		Validity:       ValidityFull,
+		ValidityReason: nil,
+		PubkeyAlgo:     sig.PubkeyAlgo, // Ignore in comparison
+		HashAlgo:       sig.HashAlgo,   // Ignore in comparison
+	}
+	if sig != expectedSig {
+		t.Errorf("Signature verification does not match: %#v vs. %#v", sig, expectedSig)
+	}
+
 	diff(t, buf.Bytes(), []byte("Test message\n"))
 }
 
