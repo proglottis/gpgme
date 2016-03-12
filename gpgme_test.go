@@ -135,8 +135,11 @@ func skipGPG2x(t *testing.T, msg string) {
 	info, err := GetEngineInfo()
 	checkError(t, err)
 	for info != nil {
-		if strings.Contains(info.FileName(), "gpg") && strings.HasPrefix(info.Version(), "2.") {
-			t.Skip(msg)
+		if info.Protocol() == ProtocolOpenPGP {
+			if strings.Contains(info.FileName(), "gpg") && strings.HasPrefix(info.Version(), "2.") {
+				t.Skip(msg)
+			}
+			return
 		}
 		info = info.Next()
 	}
