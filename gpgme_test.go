@@ -50,6 +50,7 @@ EV/5zFTEpzm4CtYHHdmY5uCaEJq/4hhE8BY8
 func TestMain(m *testing.M) {
 	flag.Parse()
 	os.Setenv("GNUPGHOME", testGPGHome)
+	unsetenvGPGAgentInfo()
 	os.Exit(m.Run())
 }
 
