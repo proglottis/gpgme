@@ -11,6 +11,7 @@ import (
 )
 
 const (
+	testGPGHome    = "./testdata/gpghome"
 	testData       = "data\n"
 	testCipherText = `-----BEGIN PGP MESSAGE-----
 Version: GnuPG v1
@@ -48,7 +49,7 @@ EV/5zFTEpzm4CtYHHdmY5uCaEJq/4hhE8BY8
 
 func TestMain(m *testing.M) {
 	flag.Parse()
-	os.Setenv("GNUPGHOME", "./testdata/gpghome")
+	os.Setenv("GNUPGHOME", testGPGHome)
 	os.Exit(m.Run())
 }
 
@@ -130,20 +131,36 @@ func TestContext_DecryptVerify(t *testing.T) {
 	diff(t, buf.Bytes(), []byte("Test message\n"))
 }
 
-func skipGPG2x(t *testing.T, msg string) {
+func isGPG2x(t *testing.T) (bool, string) {
 	var info *EngineInfo
 	info, err := GetEngineInfo()
 	checkError(t, err)
 	for info != nil {
 		if info.Protocol() == ProtocolOpenPGP {
 			if strings.Contains(info.FileName(), "gpg") && strings.HasPrefix(info.Version(), "2.") {
-				t.Skip(msg)
+				return true, info.FileName()
 			}
-			return
+			return false, ""
 		}
 		info = info.Next()
 	}
+	return false, ""
+}
 
+func skipGPG2x(t *testing.T, msg string) {
+	if isv2, gpgPath := isGPG2x(t); isv2 {
+		// If this is a common Fedora location, try the v1 location as well.
+		if gpgPath == "/usr/bin/gpg2" {
+			if _, err := os.Stat("/usr/bin/gpg"); err == nil {
+				err := SetEngineInfo(ProtocolOpenPGP, "/usr/bin/gpg", testGPGHome)
+				checkError(t, err)
+			}
+		}
+		// Test again
+		if isv2, _ = isGPG2x(t); isv2 {
+			t.Skip(msg)
+		}
+	}
 }
 
 func diff(t *testing.T, dst, src []byte) {

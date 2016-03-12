@@ -169,6 +169,17 @@ func GetEngineInfo() (*EngineInfo, error) {
 	return info, handleError(C.gpgme_get_engine_info(&info.info))
 }
 
+func SetEngineInfo(proto Protocol, fileName, homeDir string) error {
+	cfn := C.CString(fileName)
+	defer C.free(unsafe.Pointer(cfn))
+	var chome *C.char
+	if homeDir != "" {
+		chome := C.CString(homeDir)
+		defer C.free(unsafe.Pointer(chome))
+	}
+	return handleError(C.gpgme_set_engine_info(C.gpgme_protocol_t(proto), cfn, chome))
+}
+
 func FindKeys(pattern string, secretOnly bool) ([]*Key, error) {
 	var keys []*Key
 	ctx, err := New()
