@@ -52,6 +52,22 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+func ctxWithCallback(t *testing.T) *Context {
+	skipGPG2x(t, "can only set password callback for GPG v1.x")
+
+	ctx, err := New()
+	checkError(t, err)
+
+	checkError(t, ctx.SetCallback(func(uid_hint string, prev_was_bad bool, f *os.File) error {
+		if prev_was_bad {
+			t.Fatal("Bad passphrase")
+		}
+		_, err := io.WriteString(f, "password\n")
+		return err
+	}))
+	return ctx
+}
+
 func TestContext_Armor(t *testing.T) {
 	ctx, err := New()
 	checkError(t, err)
@@ -101,18 +117,8 @@ func TestContext_Encrypt(t *testing.T) {
 }
 
 func TestContext_Decrypt(t *testing.T) {
-	skipGPG2x(t, "can only set password callback for GPG v1.x")
+	ctx := ctxWithCallback(t)
 
-	ctx, err := New()
-	checkError(t, err)
-
-	checkError(t, ctx.SetCallback(func(uid_hint string, prev_was_bad bool, f *os.File) error {
-		if prev_was_bad {
-			t.Fatal("Bad passphrase")
-		}
-		_, err := io.WriteString(f, "password\n")
-		return err
-	}))
 	cipher, err := NewDataBytes([]byte(testCipherText))
 	checkError(t, err)
 	var buf bytes.Buffer
@@ -123,18 +129,8 @@ func TestContext_Decrypt(t *testing.T) {
 }
 
 func TestContext_DecryptVerify(t *testing.T) {
-	skipGPG2x(t, "can only set password callback for GPG v1.x")
+	ctx := ctxWithCallback(t)
 
-	ctx, err := New()
-	checkError(t, err)
-
-	checkError(t, ctx.SetCallback(func(uid_hint string, prev_was_bad bool, f *os.File) error {
-		if prev_was_bad {
-			t.Fatal("Bad passphrase")
-		}
-		_, err := io.WriteString(f, "password\n")
-		return err
-	}))
 	cipher, err := NewDataBytes([]byte(textSignedCipherText))
 	checkError(t, err)
 	var buf bytes.Buffer
