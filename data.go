@@ -13,6 +13,12 @@ import (
 	"unsafe"
 )
 
+const (
+	SeekSet = C.SEEK_SET
+	SeekCur = C.SEEK_CUR
+	SeekEnd = C.SEEK_END
+)
+
 //export gogpgme_readfunc
 func gogpgme_readfunc(handle, buffer unsafe.Pointer, size C.size_t) C.ssize_t {
 	d := callbackLookup(*(*int)(handle)).(*Data)

@@ -205,7 +205,7 @@ func Decrypt(r io.Reader) (*Data, error) {
 		return nil, err
 	}
 	err = ctx.Decrypt(cipher, plain)
-	plain.Seek(0, 0)
+	plain.Seek(0, SeekSet)
 	return plain, err
 }
 
