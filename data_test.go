@@ -15,7 +15,7 @@ func TestNewData(t *testing.T) {
 		_, err := dh.Write([]byte(testData))
 		checkError(t, err)
 	}
-	_, err = dh.Seek(0, 0)
+	_, err = dh.Seek(0, SeekSet)
 	checkError(t, err)
 
 	var buf bytes.Buffer
@@ -41,7 +41,7 @@ func TestDataNewDataFile(t *testing.T) {
 		_, err := dh.Write([]byte(testData))
 		checkError(t, err)
 	}
-	_, err = dh.Seek(0, 0)
+	_, err = dh.Seek(0, SeekSet)
 	checkError(t, err)
 	var buf bytes.Buffer
 	_, err = io.Copy(&buf, dh)

@@ -40,6 +40,18 @@ unsigned int key_is_qualified(gpgme_key_t k) {
 	return k->is_qualified;
 }
 
+unsigned int signature_wrong_key_usage(gpgme_signature_t s) {
+    return s->wrong_key_usage;
+}
+
+unsigned int signature_pka_trust(gpgme_signature_t s) {
+    return s->pka_trust;
+}
+
+unsigned int signature_chain_model(gpgme_signature_t s) {
+    return s->chain_model;
+}
+
 extern unsigned int subkey_revoked(gpgme_subkey_t k) {
 	return k->revoked;
 }
