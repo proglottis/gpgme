@@ -41,14 +41,14 @@ type Protocol int
 
 const (
 	ProtocolOpenPGP  Protocol = C.GPGME_PROTOCOL_OpenPGP
-	ProtocolCMS               = C.GPGME_PROTOCOL_CMS
-	ProtocolGPGConf           = C.GPGME_PROTOCOL_GPGCONF
-	ProtocolAssuan            = C.GPGME_PROTOCOL_ASSUAN
-	ProtocolG13               = C.GPGME_PROTOCOL_G13
-	ProtocolUIServer          = C.GPGME_PROTOCOL_UISERVER
-	ProtocolSpawn             = C.GPGME_PROTOCOL_SPAWN
-	ProtocolDefault           = C.GPGME_PROTOCOL_DEFAULT
-	ProtocolUnknown           = C.GPGME_PROTOCOL_UNKNOWN
+	ProtocolCMS      Protocol = C.GPGME_PROTOCOL_CMS
+	ProtocolGPGConf  Protocol = C.GPGME_PROTOCOL_GPGCONF
+	ProtocolAssuan   Protocol = C.GPGME_PROTOCOL_ASSUAN
+	ProtocolG13      Protocol = C.GPGME_PROTOCOL_G13
+	ProtocolUIServer Protocol = C.GPGME_PROTOCOL_UISERVER
+	ProtocolSpawn    Protocol = C.GPGME_PROTOCOL_SPAWN
+	ProtocolDefault  Protocol = C.GPGME_PROTOCOL_DEFAULT
+	ProtocolUnknown  Protocol = C.GPGME_PROTOCOL_UNKNOWN
 )
 
 type PinEntryMode int
