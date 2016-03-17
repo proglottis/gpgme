@@ -27,6 +27,21 @@ func TestNewData(t *testing.T) {
 	dh.Close()
 }
 
+func TestNewDataBytes(t *testing.T) {
+	// Test ordinary data, and empty slices
+	for _, content := range [][]byte{[]byte("content"), []byte{}} {
+		dh, err := NewDataBytes(content)
+		checkError(t, err)
+
+		_, err = dh.Seek(0, SeekSet)
+		checkError(t, err)
+		var buf bytes.Buffer
+		_, err = io.Copy(&buf, dh)
+		checkError(t, err)
+		diff(t, buf.Bytes(), content)
+	}
+}
+
 func TestDataNewDataFile(t *testing.T) {
 	f, err := ioutil.TempFile("", "gpgme")
 	checkError(t, err)

@@ -92,7 +92,11 @@ func NewDataFile(f *os.File) (*Data, error) {
 // NewDataBytes returns a new memory based data buffer that contains `b` bytes
 func NewDataBytes(b []byte) (*Data, error) {
 	d := newData()
-	return d, handleError(C.gpgme_data_new_from_mem(&d.dh, (*C.char)(unsafe.Pointer(&b[0])), C.size_t(len(b)), 1))
+	var cb *C.char
+	if len(b) != 0 {
+		cb = (*C.char)(unsafe.Pointer(&b[0]))
+	}
+	return d, handleError(C.gpgme_data_new_from_mem(&d.dh, cb, C.size_t(len(b)), 1))
 }
 
 // NewDataReader returns a new callback based data buffer
