@@ -147,6 +147,24 @@ func TestContext_TextMode(t *testing.T) {
 	}
 }
 
+func TestContext_EngineInfo(t *testing.T) {
+	ctx, err := New()
+	checkError(t, err)
+
+	testProto := ProtocolOpenPGP
+	testFN := "testFN"
+	testHomeDir := "testHomeDir"
+	checkError(t, ctx.SetEngineInfo(testProto, testFN, testHomeDir))
+
+	info := ctx.EngineInfo()
+	compareEngineInfo(t, info, testProto, testFN, testHomeDir)
+
+	// SetEngineInfo with empty strings works, using defaults which we don't know,
+	// so just test that it doesn't fail.
+	checkError(t, ctx.SetEngineInfo(testProto, testFN, ""))
+	checkError(t, ctx.SetEngineInfo(testProto, "", testHomeDir))
+}
+
 func TestContext_Encrypt(t *testing.T) {
 	ctx, err := New()
 	checkError(t, err)

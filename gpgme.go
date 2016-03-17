@@ -343,6 +343,19 @@ func (c *Context) EngineInfo() *EngineInfo {
 	return &EngineInfo{info: C.gpgme_ctx_get_engine_info(c.ctx)}
 }
 
+func (c *Context) SetEngineInfo(proto Protocol, fileName, homeDir string) error {
+	var cfn, chome *C.char
+	if fileName != "" {
+		cfn = C.CString(fileName)
+		defer C.free(unsafe.Pointer(cfn))
+	}
+	if homeDir != "" {
+		chome = C.CString(homeDir)
+		defer C.free(unsafe.Pointer(chome))
+	}
+	return handleError(C.gpgme_ctx_set_engine_info(c.ctx, C.gpgme_protocol_t(proto), cfn, chome))
+}
+
 func (c *Context) KeyListStart(pattern string, secretOnly bool) error {
 	cpattern := C.CString(pattern)
 	defer C.free(unsafe.Pointer(cpattern))
