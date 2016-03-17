@@ -202,11 +202,13 @@ func GetEngineInfo() (*EngineInfo, error) {
 }
 
 func SetEngineInfo(proto Protocol, fileName, homeDir string) error {
-	cfn := C.CString(fileName)
-	defer C.free(unsafe.Pointer(cfn))
-	var chome *C.char
+	var cfn, chome *C.char
+	if fileName != "" {
+		cfn = C.CString(fileName)
+		defer C.free(unsafe.Pointer(cfn))
+	}
 	if homeDir != "" {
-		chome := C.CString(homeDir)
+		chome = C.CString(homeDir)
 		defer C.free(unsafe.Pointer(chome))
 	}
 	return handleError(C.gpgme_set_engine_info(C.gpgme_protocol_t(proto), cfn, chome))

@@ -67,6 +67,42 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+func compareEngineInfo(t *testing.T, info *EngineInfo, proto Protocol, fileName, homeDir string) {
+	for info != nil && info.Protocol() != proto {
+		info = info.Next()
+	}
+	if info == nil {
+		t.Errorf("Expected engine info %d not found", proto)
+		return
+	}
+	if info.FileName() != fileName {
+		t.Errorf("Testing file name %s does not match %s", info.FileName(), fileName)
+	}
+	if info.HomeDir() != homeDir {
+		t.Errorf("Testing home directory %s does not match %s", info.HomeDir(), homeDir)
+	}
+}
+
+func TestEngineInfo(t *testing.T) {
+	testProto := ProtocolOpenPGP // Careful, this is global state!
+	defer func() {
+		SetEngineInfo(testProto, "", "") // Try to reset to defaults after we are done.
+	}()
+
+	testFN := "testFN"
+	testHomeDir := "testHomeDir"
+	checkError(t, SetEngineInfo(testProto, testFN, testHomeDir))
+
+	info, err := GetEngineInfo()
+	checkError(t, err)
+	compareEngineInfo(t, info, testProto, testFN, testHomeDir)
+
+	// SetEngineInfo with empty strings works, using defaults which we don't know,
+	// so just test that it doesn't fail.
+	checkError(t, SetEngineInfo(testProto, testFN, ""))
+	checkError(t, SetEngineInfo(testProto, "", testHomeDir))
+}
+
 func ctxWithCallback(t *testing.T) *Context {
 	skipGPG2x(t, "can only set password callback for GPG v1.x")
 
