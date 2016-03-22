@@ -55,20 +55,20 @@ type PinEntryMode int
 
 const (
 	PinEntryDefault  PinEntryMode = C.GPGME_PINENTRY_MODE_DEFAULT
-	PinEntryAsk                   = C.GPGME_PINENTRY_MODE_ASK
-	PinEntryCancel                = C.GPGME_PINENTRY_MODE_CANCEL
-	PinEntryError                 = C.GPGME_PINENTRY_MODE_ERROR
-	PinEntryLoopback              = C.GPGME_PINENTRY_MODE_LOOPBACK
+	PinEntryAsk      PinEntryMode = C.GPGME_PINENTRY_MODE_ASK
+	PinEntryCancel   PinEntryMode = C.GPGME_PINENTRY_MODE_CANCEL
+	PinEntryError    PinEntryMode = C.GPGME_PINENTRY_MODE_ERROR
+	PinEntryLoopback PinEntryMode = C.GPGME_PINENTRY_MODE_LOOPBACK
 )
 
 type EncryptFlag uint
 
 const (
 	EncryptAlwaysTrust EncryptFlag = C.GPGME_ENCRYPT_ALWAYS_TRUST
-	EncryptNoEncryptTo             = C.GPGME_ENCRYPT_NO_ENCRYPT_TO
-	EncryptPrepare                 = C.GPGME_ENCRYPT_PREPARE
-	EncryptExceptSign              = C.GPGME_ENCRYPT_EXPECT_SIGN
-	EncryptNoCompress              = C.GPGME_ENCRYPT_NO_COMPRESS
+	EncryptNoEncryptTo EncryptFlag = C.GPGME_ENCRYPT_NO_ENCRYPT_TO
+	EncryptPrepare     EncryptFlag = C.GPGME_ENCRYPT_PREPARE
+	EncryptExceptSign  EncryptFlag = C.GPGME_ENCRYPT_EXPECT_SIGN
+	EncryptNoCompress  EncryptFlag = C.GPGME_ENCRYPT_NO_COMPRESS
 )
 
 type HashAlgo int
@@ -79,12 +79,12 @@ type KeyListMode uint
 
 const (
 	KeyListModeLocal        KeyListMode = C.GPGME_KEYLIST_MODE_LOCAL
-	KeyListModeExtern                   = C.GPGME_KEYLIST_MODE_EXTERN
-	KeyListModeSigs                     = C.GPGME_KEYLIST_MODE_SIGS
-	KeyListModeSigNotations             = C.GPGME_KEYLIST_MODE_SIG_NOTATIONS
-	KeyListModeWithSecret               = C.GPGME_KEYLIST_MODE_WITH_SECRET
-	KeyListModeEphemeral                = C.GPGME_KEYLIST_MODE_EPHEMERAL
-	KeyListModeModeValidate             = C.GPGME_KEYLIST_MODE_VALIDATE
+	KeyListModeExtern       KeyListMode = C.GPGME_KEYLIST_MODE_EXTERN
+	KeyListModeSigs         KeyListMode = C.GPGME_KEYLIST_MODE_SIGS
+	KeyListModeSigNotations KeyListMode = C.GPGME_KEYLIST_MODE_SIG_NOTATIONS
+	KeyListModeWithSecret   KeyListMode = C.GPGME_KEYLIST_MODE_WITH_SECRET
+	KeyListModeEphemeral    KeyListMode = C.GPGME_KEYLIST_MODE_EPHEMERAL
+	KeyListModeModeValidate KeyListMode = C.GPGME_KEYLIST_MODE_VALIDATE
 )
 
 type PubkeyAlgo int
@@ -95,42 +95,42 @@ type SigMode int
 
 const (
 	SigModeNormal SigMode = C.GPGME_SIG_MODE_NORMAL
-	SigModeDetach         = C.GPGME_SIG_MODE_DETACH
-	SigModeClear          = C.GPGME_SIG_MODE_CLEAR
+	SigModeDetach SigMode = C.GPGME_SIG_MODE_DETACH
+	SigModeClear  SigMode = C.GPGME_SIG_MODE_CLEAR
 )
 
 type SigSum int
 
 const (
 	SigSumValid      SigSum = C.GPGME_SIGSUM_VALID
-	SigSumGreen             = C.GPGME_SIGSUM_GREEN
-	SigSumRed               = C.GPGME_SIGSUM_RED
-	SigSumKeyRevoked        = C.GPGME_SIGSUM_KEY_REVOKED
-	SigSumKeyExpired        = C.GPGME_SIGSUM_KEY_EXPIRED
-	SigSumSigExpired        = C.GPGME_SIGSUM_SIG_EXPIRED
-	SigSumKeyMissing        = C.GPGME_SIGSUM_KEY_MISSING
-	SigSumCRLMissing        = C.GPGME_SIGSUM_CRL_MISSING
-	SigSumCRLTooOld         = C.GPGME_SIGSUM_CRL_TOO_OLD
-	SigSumBadPolicy         = C.GPGME_SIGSUM_BAD_POLICY
-	SigSumSysError          = C.GPGME_SIGSUM_SYS_ERROR
+	SigSumGreen      SigSum = C.GPGME_SIGSUM_GREEN
+	SigSumRed        SigSum = C.GPGME_SIGSUM_RED
+	SigSumKeyRevoked SigSum = C.GPGME_SIGSUM_KEY_REVOKED
+	SigSumKeyExpired SigSum = C.GPGME_SIGSUM_KEY_EXPIRED
+	SigSumSigExpired SigSum = C.GPGME_SIGSUM_SIG_EXPIRED
+	SigSumKeyMissing SigSum = C.GPGME_SIGSUM_KEY_MISSING
+	SigSumCRLMissing SigSum = C.GPGME_SIGSUM_CRL_MISSING
+	SigSumCRLTooOld  SigSum = C.GPGME_SIGSUM_CRL_TOO_OLD
+	SigSumBadPolicy  SigSum = C.GPGME_SIGSUM_BAD_POLICY
+	SigSumSysError   SigSum = C.GPGME_SIGSUM_SYS_ERROR
 )
 
 type Validity int
 
 const (
 	ValidityUnknown   Validity = C.GPGME_VALIDITY_UNKNOWN
-	ValidityUndefined          = C.GPGME_VALIDITY_UNDEFINED
-	ValidityNever              = C.GPGME_VALIDITY_NEVER
-	ValidityMarginal           = C.GPGME_VALIDITY_MARGINAL
-	ValidityFull               = C.GPGME_VALIDITY_FULL
-	ValidityUltimate           = C.GPGME_VALIDITY_ULTIMATE
+	ValidityUndefined Validity = C.GPGME_VALIDITY_UNDEFINED
+	ValidityNever     Validity = C.GPGME_VALIDITY_NEVER
+	ValidityMarginal  Validity = C.GPGME_VALIDITY_MARGINAL
+	ValidityFull      Validity = C.GPGME_VALIDITY_FULL
+	ValidityUltimate  Validity = C.GPGME_VALIDITY_ULTIMATE
 )
 
 type ErrorCode int
 
 const (
 	ErrorNoError ErrorCode = C.GPG_ERR_NO_ERROR
-	ErrorEOF               = C.GPG_ERR_EOF
+	ErrorEOF     ErrorCode = C.GPG_ERR_EOF
 )
 
 // Error is a wrapper for GPGME errors
