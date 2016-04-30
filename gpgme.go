@@ -26,7 +26,7 @@ type Callback func(uidHint string, prevWasBad bool, f *os.File) error
 
 //export gogpgme_passfunc
 func gogpgme_passfunc(hook unsafe.Pointer, uid_hint, passphrase_info *C.char, prev_was_bad, fd C.int) C.gpgme_error_t {
-	c := callbackLookup(uintptr(hook)).(*Context)
+	c := callbackLookup(hook).(*Context)
 	go_uid_hint := C.GoString(uid_hint)
 	f := os.NewFile(uintptr(fd), go_uid_hint)
 	defer f.Close()
@@ -259,7 +259,7 @@ type Context struct {
 	KeyError error
 
 	callback Callback
-	cbc      uintptr
+	cbc      unsafe.Pointer
 
 	ctx C.gpgme_ctx_t
 }
@@ -275,7 +275,7 @@ func (c *Context) Release() {
 	if c.ctx == nil {
 		return
 	}
-	if c.cbc > 0 {
+	if c.cbc != nil {
 		callbackDelete(c.cbc)
 	}
 	C.gpgme_release(c.ctx)
@@ -325,15 +325,14 @@ func (c *Context) PinEntryMode() PinEntryMode {
 func (c *Context) SetCallback(callback Callback) error {
 	var err error
 	c.callback = callback
-	if c.cbc > 0 {
+	if c.cbc != nil {
 		callbackDelete(c.cbc)
 	}
 	if callback != nil {
-		cbc := callbackAdd(c)
-		c.cbc = cbc
-		_, err = C.gpgme_set_passphrase_cb(c.ctx, C.gpgme_passphrase_cb_t(C.gogpgme_passfunc), unsafe.Pointer(cbc))
+		c.cbc = callbackAdd(c)
+		_, err = C.gpgme_set_passphrase_cb(c.ctx, C.gpgme_passphrase_cb_t(C.gogpgme_passfunc), c.cbc)
 	} else {
-		c.cbc = 0
+		c.cbc = nil
 		_, err = C.gpgme_set_passphrase_cb(c.ctx, nil, nil)
 	}
 	return err
