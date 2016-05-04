@@ -331,10 +331,10 @@ func (c *Context) SetCallback(callback Callback) error {
 	if callback != nil {
 		cbc := callbackAdd(c)
 		c.cbc = cbc
-		_, err = C.gpgme_set_passphrase_cb(c.ctx, C.gpgme_passphrase_cb_t(C.gogpgme_passfunc), unsafe.Pointer(cbc))
+		_, err = C.gogpgme_set_passphrase_cb(c.ctx, C.gpgme_passphrase_cb_t(C.gogpgme_passfunc), C.uintptr_t(cbc))
 	} else {
 		c.cbc = 0
-		_, err = C.gpgme_set_passphrase_cb(c.ctx, nil, nil)
+		_, err = C.gogpgme_set_passphrase_cb(c.ctx, nil, 0)
 	}
 	return err
 }
