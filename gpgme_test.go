@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"flag"
 	"io"
+	"io/ioutil"
 	"os"
 	"runtime"
 	"strings"
@@ -269,6 +270,60 @@ func TestContext_Verify(t *testing.T) {
 	}
 
 	diff(t, buf.Bytes(), []byte("Test message\n"))
+}
+
+func TestContext_Import(t *testing.T) {
+	homeDir, err := ioutil.TempDir("", "gpgme-import-test")
+	checkError(t, err)
+	defer os.RemoveAll(homeDir)
+
+	ctx, err := New()
+	checkError(t, err)
+	checkError(t, ctx.SetEngineInfo(ProtocolOpenPGP, "", homeDir))
+
+	f, err := os.Open("./testdata/pubkeys.gpg")
+	checkError(t, err)
+	defer f.Close()
+	dh, err := NewDataFile(f)
+	checkError(t, err)
+	defer dh.Close()
+
+	res, err := ctx.Import(dh)
+	checkError(t, err)
+
+	for _, v := range []struct {
+		Name     string
+		Value    int
+		Expected int
+	}{
+		{"Considered", res.Considered, 1},
+		{"NoUserID", res.NoUserID, 0},
+		{"Imported", res.Imported, 1},
+		// Do not test ImportedRSA, as of gnupg 2.1.11 the value is always 0.
+		{"Unchanged", res.Unchanged, 0},
+		{"NewUserIDs", res.NewUserIDs, 0},
+		{"NewSubKeys", res.NewSubKeys, 0},
+		{"NewSignatures", res.NewSignatures, 0},
+		{"NewRevocations", res.NewRevocations, 0},
+		{"SecretRead", res.SecretRead, 0},
+		{"SecretImported", res.SecretImported, 0},
+		{"SecretUnchanged", res.SecretUnchanged, 0},
+		{"NotImported", res.NotImported, 0},
+	} {
+		if v.Value != v.Expected {
+			t.Errorf("Unexpected import result field %s, value %d, expected %d", v.Name, v.Value, v.Expected)
+		}
+	}
+	expectedStatus := ImportStatus{
+		Fingerprint: "44B646DC347C31E867FF4F450327FFB0229F6136",
+		Result:      nil,
+		Status:      ImportNew,
+	}
+	if len(res.Imports) != 1 {
+		t.Errorf("Unexpected number of import status values %d", len(res.Imports))
+	} else if res.Imports[0] != expectedStatus {
+		t.Errorf("Import status does not match: %#v vs. %#v", res.Imports[0], expectedStatus)
+	}
 }
 
 func isGPG2x(t *testing.T) (bool, string) {
