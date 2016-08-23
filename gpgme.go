@@ -9,9 +9,13 @@ package gpgme
 import "C"
 
 import (
+	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"runtime"
+	"sync"
+	"sync/atomic"
 	"time"
 	"unsafe"
 )
@@ -471,6 +475,54 @@ func (c *Context) Sign(signers []*Key, plain, sig *Data, mode SigMode) error {
 	return handleError(C.gpgme_op_sign(c.ctx, plain.dh, sig.dh, C.gpgme_sig_mode_t(mode)))
 }
 
+type AssuanStatusCB func(status string, args string)
+
+var assuan struct {
+	callbacks map[int32]AssuanStatusCB
+	currentID int32
+	mutex     sync.RWMutex
+}
+
+func init() {
+	assuan.callbacks = make(map[int32]AssuanStatusCB)
+}
+
+// AssuanSend sends a raw Assuan command to gpg-agent
+func (c *Context) AssuanSend(cmd string, callback AssuanStatusCB) error {
+	var operr C.gpgme_error_t
+	callbackID := atomic.AddInt32(&assuan.currentID, 1)
+	assuan.mutex.Lock()
+	assuan.callbacks[callbackID] = callback
+	assuan.mutex.Unlock()
+	defer delete(assuan.callbacks, callbackID)
+
+	err := C.gpgme_op_assuan_transact_ext(
+		c.ctx,
+		C.CString(cmd),
+		(C.gpgme_assuan_data_cb_t)(unsafe.Pointer(C.gogpgme_assuan_data_callback)), nil,
+		nil, nil,
+		(C.gpgme_assuan_data_cb_t)(unsafe.Pointer(C.gogpgme_assuan_status_callback)), unsafe.Pointer(&callbackID),
+		&operr)
+	return handleError(err)
+}
+
+//export gogpgme_assuan_data_callback
+func gogpgme_assuan_data_callback(opaque unsafe.Pointer, data unsafe.Pointer, datalen C.size_t) C.gpgme_error_t {
+	datastr := C.GoStringN((*C.char)(data), (C.int)(datalen))
+	fmt.Println("data callback called")
+	fmt.Println(datastr)
+	return 0
+}
+
+//export gogpgme_assuan_status_callback
+func gogpgme_assuan_status_callback(opaque unsafe.Pointer, cStatus *C.char, cArgs *C.char) C.gpgme_error_t {
+	callbackID := (*C.int)(unsafe.Pointer(opaque))
+	status := C.GoString(cStatus)
+	args := C.GoString(cArgs)
+	assuan.callbacks[int32(*callbackID)](status, args)
+
+	return 0
+}
 // ImportStatusFlags describes the type of ImportStatus.Status. The C API in gpgme.h simply uses "unsigned".
 type ImportStatusFlags uint
 
