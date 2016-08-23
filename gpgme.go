@@ -523,6 +523,19 @@ func gogpgme_assuan_status_callback(opaque unsafe.Pointer, cStatus *C.char, cArg
 
 	return 0
 }
+
+func (c *Context) Export(keyid uint64) []byte {
+	data, _ := NewData()
+	//c.SetArmor(true)
+	err := handleError(C.gpgme_op_export(c.ctx, nil, 0, data.dh))
+	data.Seek(0, 0)
+	out, err := ioutil.ReadAll(data)
+	if err != nil {
+		fmt.Println("Error reading data")
+	}
+	return out
+}
+
 // ImportStatusFlags describes the type of ImportStatus.Status. The C API in gpgme.h simply uses "unsigned".
 type ImportStatusFlags uint
 
