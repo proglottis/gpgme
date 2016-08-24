@@ -509,8 +509,6 @@ func (c *Context) AssuanSend(cmd string, callback AssuanStatusCB) error {
 //export gogpgme_assuan_data_callback
 func gogpgme_assuan_data_callback(opaque unsafe.Pointer, data unsafe.Pointer, datalen C.size_t) C.gpgme_error_t {
 	datastr := C.GoStringN((*C.char)(data), (C.int)(datalen))
-	fmt.Println("data callback called")
-	fmt.Println(datastr)
 	return 0
 }
 
@@ -526,7 +524,6 @@ func gogpgme_assuan_status_callback(opaque unsafe.Pointer, cStatus *C.char, cArg
 
 func (c *Context) Export(keyid uint64) []byte {
 	data, _ := NewData()
-	//c.SetArmor(true)
 	err := handleError(C.gpgme_op_export(c.ctx, nil, 0, data.dh))
 	data.Seek(0, 0)
 	out, err := ioutil.ReadAll(data)
