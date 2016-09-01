@@ -7,15 +7,12 @@ package gpgme
 // #include <gpgme.h>
 // #include "go_gpgme.h"
 import "C"
-
 import (
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"runtime"
-	"sync"
-	"sync/atomic"
 	"time"
 	"unsafe"
 )
@@ -475,50 +472,66 @@ func (c *Context) Sign(signers []*Key, plain, sig *Data, mode SigMode) error {
 	return handleError(C.gpgme_op_sign(c.ctx, plain.dh, sig.dh, C.gpgme_sig_mode_t(mode)))
 }
 
-type AssuanStatusCB func(status string, args string)
-
-var assuan struct {
-	callbacks map[int32]AssuanStatusCB
-	currentID int32
-	mutex     sync.RWMutex
-}
-
-func init() {
-	assuan.callbacks = make(map[int32]AssuanStatusCB)
-}
+type AssuanDataCallback func(data []byte) error
+type AssuanInquireCallback func(name, args string) error
+type AssuanStatusCallback func(status, args string) error
 
 // AssuanSend sends a raw Assuan command to gpg-agent
-func (c *Context) AssuanSend(cmd string, callback AssuanStatusCB) error {
+func (c *Context) AssuanSend(
+	cmd string,
+	data AssuanDataCallback,
+	inquiry AssuanInquireCallback,
+	status AssuanStatusCallback,
+) error {
 	var operr C.gpgme_error_t
-	callbackID := atomic.AddInt32(&assuan.currentID, 1)
-	assuan.mutex.Lock()
-	assuan.callbacks[callbackID] = callback
-	assuan.mutex.Unlock()
-	defer delete(assuan.callbacks, callbackID)
 
+	dataPtr := callbackAdd(&data)
+	inquiryPtr := callbackAdd(&inquiry)
+	statusPtr := callbackAdd(&status)
+	cmdCStr := C.CString(cmd)
+	defer C.free(unsafe.Pointer(cmdCStr))
 	err := C.gpgme_op_assuan_transact_ext(
 		c.ctx,
-		C.CString(cmd),
-		(C.gpgme_assuan_data_cb_t)(unsafe.Pointer(C.gogpgme_assuan_data_callback)), nil,
-		nil, nil,
-		(C.gpgme_assuan_data_cb_t)(unsafe.Pointer(C.gogpgme_assuan_status_callback)), unsafe.Pointer(&callbackID),
-		&operr)
+		cmdCStr,
+		C.gpgme_assuan_data_cb_t(unsafe.Pointer(C.gogpgme_assuan_data_callback)), unsafe.Pointer(dataPtr),
+		C.gpgme_assuan_data_cb_t(unsafe.Pointer(C.gogpgme_assuan_inquiry_callback)), unsafe.Pointer(inquiryPtr),
+		C.gpgme_assuan_data_cb_t(unsafe.Pointer(C.gogpgme_assuan_status_callback)), unsafe.Pointer(statusPtr),
+		&operr,
+	)
 	return handleError(err)
 }
 
 //export gogpgme_assuan_data_callback
-func gogpgme_assuan_data_callback(opaque unsafe.Pointer, data unsafe.Pointer, datalen C.size_t) C.gpgme_error_t {
-	datastr := C.GoStringN((*C.char)(data), (C.int)(datalen))
+func gogpgme_assuan_data_callback(handle unsafe.Pointer, data unsafe.Pointer, datalen C.size_t) C.gpgme_error_t {
+	c := callbackLookup(uintptr(handle)).(*AssuanDataCallback)
+	if *c == nil {
+		return 0
+	}
+	(*c)(C.GoBytes(data, C.int(datalen)))
+	return 0
+}
+
+//export gogpgme_assuan_inquiry_callback
+func gogpgme_assuan_inquiry_callback(handle unsafe.Pointer, cName *C.char, cArgs *C.char) C.gpgme_error_t {
+	name := C.GoString(cName)
+	args := C.GoString(cArgs)
+	c := callbackLookup(uintptr(handle)).(*AssuanInquireCallback)
+	if *c == nil {
+		return 0
+	}
+	(*c)(name, args)
 	return 0
 }
 
 //export gogpgme_assuan_status_callback
-func gogpgme_assuan_status_callback(opaque unsafe.Pointer, cStatus *C.char, cArgs *C.char) C.gpgme_error_t {
-	callbackID := (*C.int)(unsafe.Pointer(opaque))
+func gogpgme_assuan_status_callback(handle unsafe.Pointer, cStatus *C.char, cArgs *C.char) C.gpgme_error_t {
 	status := C.GoString(cStatus)
 	args := C.GoString(cArgs)
-	assuan.callbacks[int32(*callbackID)](status, args)
-
+	c := callbackLookup(uintptr(handle)).(*AssuanStatusCallback)
+	if *c == nil {
+		return 0
+	}
+	(*c)(status, args)
 	return 0
 }
 

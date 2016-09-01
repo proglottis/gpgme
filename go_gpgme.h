@@ -14,6 +14,7 @@ extern gpgme_error_t gogpgme_data_new_from_cbs(gpgme_data_t *dh, gpgme_data_cbs_
 extern void gogpgme_set_passphrase_cb(gpgme_ctx_t ctx, gpgme_passphrase_cb_t cb, uintptr_t handle);
 
 extern gpgme_error_t gogpgme_assuan_data_callback(void *opaque, void* data, size_t datalen );
+extern gpgme_error_t gogpgme_assuan_inquiry_callback(void *opaque, char* name, char* args);
 extern gpgme_error_t gogpgme_assuan_status_callback(void *opaque, char* status, char* args);
 
 extern unsigned int key_revoked(gpgme_key_t k);
