@@ -533,8 +533,21 @@ func gogpgme_assuan_status_callback(handle unsafe.Pointer, cStatus *C.char, cArg
 	return 0
 }
 
-func (c *Context) Export(keyid uint64, data *Data) error {
-	return handleError(C.gpgme_op_export(c.ctx, nil, 0, data.dh))
+// ExportModeFlags defines how keys are exported from Export
+type ExportModeFlags uint
+
+const (
+	ExportModeExtern  ExportModeFlags = C.GPGME_EXPORT_MODE_EXTERN
+	ExportModeMinimal ExportModeFlags = C.GPGME_EXPORT_MODE_MINIMAL
+	ExportModeSecret  ExportModeFlags = C.GPGME_EXPORT_MODE_SECRET
+	ExportModeRaw     ExportModeFlags = C.GPGME_EXPORT_MODE_RAW
+	ExportModePKCS12  ExportModeFlags = C.GPGME_EXPORT_MODE_PKCS12
+)
+
+func (c *Context) Export(pattern string, mode ExportModeFlags, data *Data) error {
+	pat := C.CString(pattern)
+	defer C.free(unsafe.Pointer(pat))
+	return handleError(C.gpgme_op_export(c.ctx, pat, C.gpgme_export_mode_t(mode), data.dh))
 }
 
 // ImportStatusFlags describes the type of ImportStatus.Status. The C API in gpgme.h simply uses "unsigned".
