@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"runtime"
 	"strings"
 	"testing"
@@ -342,6 +343,53 @@ func TestContext_Export(t *testing.T) {
 	if len(allKeys) < 1 {
 		t.Error("Expected exported keys, got empty buffer")
 	}
+}
+
+func TestContext_AssuanSend(t *testing.T) {
+
+	// gpg-agent might fail to start from the test directory, because
+	// the path might be longer than 108 characters, which is the maximum
+	// length for a unix socket
+	tmpdir, err := ioutil.TempDir("", "gpgme-")
+	checkError(t, err)
+	defer os.RemoveAll(tmpdir)
+
+	// Temporarily set up GNUPGHOME to a different location
+	os.Setenv("GNUPGHOME", tmpdir)
+	defer os.Setenv("GNUPGHOME", testGPGHome)
+
+	// Launch a gpg-agent in daemon mode
+	cmd := exec.Command("gpg-agent", "--daemon")
+	err = cmd.Start()
+	checkError(t, err)
+
+	ctx, err := New()
+	checkError(t, err)
+	err = ctx.SetProtocol(ProtocolAssuan)
+	checkError(t, err)
+
+	// NOP should simply succeed
+	err = ctx.AssuanSend("NOP", nil, nil, nil)
+	checkError(t, err)
+
+	// GETINFO should return a version in Data
+	var versionData []byte
+	err = ctx.AssuanSend("GETINFO version",
+		func(data []byte) error {
+			versionData = data
+			return nil
+		},
+		nil,
+		nil,
+	)
+	checkError(t, err)
+	if len(versionData) == 0 {
+		t.Error("Expected version data")
+	}
+
+	// Kill the gpg-agent started earlier
+	err = ctx.AssuanSend("KILLAGENT", nil, nil, nil)
+	checkError(t, err)
 }
 
 func isGPG2x(t *testing.T) (bool, string) {
