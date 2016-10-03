@@ -488,14 +488,18 @@ func (c *Context) AssuanSend(
 	statusPtr := callbackAdd(&status)
 	cmdCStr := C.CString(cmd)
 	defer C.free(unsafe.Pointer(cmdCStr))
-	err := C.gpgme_op_assuan_transact_ext(
+	err := C.gogpgme_op_assuan_transact_ext(
 		c.ctx,
 		cmdCStr,
-		C.gpgme_assuan_data_cb_t(unsafe.Pointer(C.gogpgme_assuan_data_callback)), unsafe.Pointer(dataPtr),
-		C.gpgme_assuan_data_cb_t(unsafe.Pointer(C.gogpgme_assuan_inquiry_callback)), unsafe.Pointer(inquiryPtr),
-		C.gpgme_assuan_data_cb_t(unsafe.Pointer(C.gogpgme_assuan_status_callback)), unsafe.Pointer(statusPtr),
+		C.uintptr_t(dataPtr),
+		C.uintptr_t(inquiryPtr),
+		C.uintptr_t(statusPtr),
 		&operr,
 	)
+
+	if handleError(operr) != nil {
+		return handleError(operr)
+	}
 	return handleError(err)
 }
 
