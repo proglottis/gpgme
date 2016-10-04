@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"runtime"
 	"strings"
 	"testing"
@@ -105,7 +106,7 @@ func TestEngineInfo(t *testing.T) {
 }
 
 func ctxWithCallback(t *testing.T) *Context {
-	skipGPG2x(t, "can only set password callback for GPG v1.x")
+	ensureVersion(t, "1.", "can only set password callback for GPG v1.x")
 
 	ctx, err := New()
 	checkError(t, err)
@@ -326,36 +327,42 @@ func TestContext_Import(t *testing.T) {
 	}
 }
 
-func isGPG2x(t *testing.T) (bool, string) {
+func isVersion(t testing.TB, version string) bool {
 	var info *EngineInfo
 	info, err := GetEngineInfo()
 	checkError(t, err)
 	for info != nil {
 		if info.Protocol() == ProtocolOpenPGP {
-			if strings.Contains(info.FileName(), "gpg") && strings.HasPrefix(info.Version(), "2.") {
-				return true, info.FileName()
+			if strings.Contains(info.FileName(), "gpg") && strings.HasPrefix(info.Version(), version) {
+				return true
 			}
-			return false, ""
+			return false
 		}
 		info = info.Next()
 	}
-	return false, ""
+	return false
 }
 
-func skipGPG2x(t *testing.T, msg string) {
-	if isv2, gpgPath := isGPG2x(t); isv2 {
-		// If this is a common Fedora location, try the v1 location as well.
-		if gpgPath == "/usr/bin/gpg2" {
-			if _, err := os.Stat("/usr/bin/gpg"); err == nil {
-				err := SetEngineInfo(ProtocolOpenPGP, "/usr/bin/gpg", testGPGHome)
-				checkError(t, err)
-			}
+var gpgBins = []string{"gpg2", "gpg1", "gpg"}
+
+// ensureVersion tries to setup gpgme with a specific version or skip
+func ensureVersion(t testing.TB, version, msg string) {
+	if isVersion(t, version) {
+		return
+	}
+	for _, bin := range gpgBins {
+		path, err := exec.LookPath(bin)
+		if err != nil {
+			continue
 		}
-		// Test again
-		if isv2, _ = isGPG2x(t); isv2 {
-			t.Skip(msg)
+		if err := SetEngineInfo(ProtocolOpenPGP, path, testGPGHome); err != nil {
+			continue
+		}
+		if isVersion(t, version) {
+			return
 		}
 	}
+	t.Skip(msg)
 }
 
 func diff(t *testing.T, dst, src []byte) {
@@ -379,7 +386,7 @@ func diff(t *testing.T, dst, src []byte) {
 	}
 }
 
-func checkError(t *testing.T, err error) {
+func checkError(t testing.TB, err error) {
 	if err == nil {
 		return
 	}
