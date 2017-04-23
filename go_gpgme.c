@@ -8,6 +8,11 @@ void gogpgme_set_passphrase_cb(gpgme_ctx_t ctx, gpgme_passphrase_cb_t cb, uintpt
 	gpgme_set_passphrase_cb(ctx, cb, (void *)handle);
 }
 
+gpgme_off_t gogpgme_data_seek(gpgme_data_t dh, gpgme_off_t offset, int whence) {
+	return gpgme_data_seek(dh, offset, whence);
+}
+
+
 unsigned int key_revoked(gpgme_key_t k) {
 	return k->revoked;
 }

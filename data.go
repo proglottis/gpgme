@@ -50,14 +50,14 @@ func gogpgme_writefunc(handle, buffer unsafe.Pointer, size C.size_t) C.ssize_t {
 }
 
 //export gogpgme_seekfunc
-func gogpgme_seekfunc(handle unsafe.Pointer, offset C.off_t, whence C.int) C.off_t {
+func gogpgme_seekfunc(handle unsafe.Pointer, offset C.gpgme_off_t, whence C.int) C.gpgme_off_t {
 	d := callbackLookup(uintptr(handle)).(*Data)
 	n, err := d.s.Seek(int64(offset), int(whence))
 	if err != nil {
 		C.gpgme_err_set_errno(C.EIO)
 		return -1
 	}
-	return C.off_t(n)
+	return C.gpgme_off_t(n)
 }
 
 // The Data buffer used to communicate with GPGME
@@ -181,7 +181,7 @@ func (d *Data) Read(p []byte) (int, error) {
 }
 
 func (d *Data) Seek(offset int64, whence int) (int64, error) {
-	n, err := C.gpgme_data_seek(d.dh, C.off_t(offset), C.int(whence))
+	n, err := C.gogpgme_data_seek(d.dh, C.gpgme_off_t(offset), C.int(whence))
 	return int64(n), err
 }
 
