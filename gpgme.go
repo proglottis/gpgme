@@ -7,7 +7,6 @@ package gpgme
 // #include <gpgme.h>
 // #include "go_gpgme.h"
 import "C"
-
 import (
 	"fmt"
 	"io"
@@ -477,6 +476,90 @@ func (c *Context) Sign(signers []*Key, plain, sig *Data, mode SigMode) error {
 		}
 	}
 	return handleError(C.gpgme_op_sign(c.ctx, plain.dh, sig.dh, C.gpgme_sig_mode_t(mode)))
+}
+
+type AssuanDataCallback func(data []byte) error
+type AssuanInquireCallback func(name, args string) error
+type AssuanStatusCallback func(status, args string) error
+
+// AssuanSend sends a raw Assuan command to gpg-agent
+func (c *Context) AssuanSend(
+	cmd string,
+	data AssuanDataCallback,
+	inquiry AssuanInquireCallback,
+	status AssuanStatusCallback,
+) error {
+	var operr C.gpgme_error_t
+
+	dataPtr := callbackAdd(&data)
+	inquiryPtr := callbackAdd(&inquiry)
+	statusPtr := callbackAdd(&status)
+	cmdCStr := C.CString(cmd)
+	defer C.free(unsafe.Pointer(cmdCStr))
+	err := C.gogpgme_op_assuan_transact_ext(
+		c.ctx,
+		cmdCStr,
+		C.uintptr_t(dataPtr),
+		C.uintptr_t(inquiryPtr),
+		C.uintptr_t(statusPtr),
+		&operr,
+	)
+
+	if handleError(operr) != nil {
+		return handleError(operr)
+	}
+	return handleError(err)
+}
+
+//export gogpgme_assuan_data_callback
+func gogpgme_assuan_data_callback(handle unsafe.Pointer, data unsafe.Pointer, datalen C.size_t) C.gpgme_error_t {
+	c := callbackLookup(uintptr(handle)).(*AssuanDataCallback)
+	if *c == nil {
+		return 0
+	}
+	(*c)(C.GoBytes(data, C.int(datalen)))
+	return 0
+}
+
+//export gogpgme_assuan_inquiry_callback
+func gogpgme_assuan_inquiry_callback(handle unsafe.Pointer, cName *C.char, cArgs *C.char) C.gpgme_error_t {
+	name := C.GoString(cName)
+	args := C.GoString(cArgs)
+	c := callbackLookup(uintptr(handle)).(*AssuanInquireCallback)
+	if *c == nil {
+		return 0
+	}
+	(*c)(name, args)
+	return 0
+}
+
+//export gogpgme_assuan_status_callback
+func gogpgme_assuan_status_callback(handle unsafe.Pointer, cStatus *C.char, cArgs *C.char) C.gpgme_error_t {
+	status := C.GoString(cStatus)
+	args := C.GoString(cArgs)
+	c := callbackLookup(uintptr(handle)).(*AssuanStatusCallback)
+	if *c == nil {
+		return 0
+	}
+	(*c)(status, args)
+	return 0
+}
+
+// ExportModeFlags defines how keys are exported from Export
+type ExportModeFlags uint
+
+const (
+	ExportModeExtern  ExportModeFlags = C.GPGME_EXPORT_MODE_EXTERN
+	ExportModeMinimal ExportModeFlags = C.GPGME_EXPORT_MODE_MINIMAL
+	ExportModeSecret  ExportModeFlags = C.GPGME_EXPORT_MODE_SECRET
+	ExportModeRaw     ExportModeFlags = C.GPGME_EXPORT_MODE_RAW
+	ExportModePKCS12  ExportModeFlags = C.GPGME_EXPORT_MODE_PKCS12
+)
+
+func (c *Context) Export(pattern string, mode ExportModeFlags, data *Data) error {
+	pat := C.CString(pattern)
+	defer C.free(unsafe.Pointer(pat))
+	return handleError(C.gpgme_op_export(c.ctx, pat, C.gpgme_export_mode_t(mode), data.dh))
 }
 
 // ImportStatusFlags describes the type of ImportStatus.Status. The C API in gpgme.h simply uses "unsigned".
