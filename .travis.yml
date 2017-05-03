@@ -47,4 +47,4 @@ install:
 - true #do not execute "go get ./..." as it will fail with the examples
 
 script:
-  - go test -v *.go
+  - go test -v .
