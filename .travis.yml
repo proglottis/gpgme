@@ -1,5 +1,8 @@
 ---
 language: go
+os:
+  - linux
+  - osx
 dist: trusty
 sudo: false
 
@@ -10,6 +13,11 @@ addons:
   apt:
     packages:
     - libgpgme11-dev
+  homebrew:
+    packages:
+    - gnupg
+    - gnupg@1.4
+    - gpgme
 
 install:
 - true #do not execute "go get ./..." as it will fail with the examples
