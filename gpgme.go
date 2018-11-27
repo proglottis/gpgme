@@ -47,7 +47,6 @@ const (
 	ProtocolAssuan   Protocol = C.GPGME_PROTOCOL_ASSUAN
 	ProtocolG13      Protocol = C.GPGME_PROTOCOL_G13
 	ProtocolUIServer Protocol = C.GPGME_PROTOCOL_UISERVER
-	ProtocolSpawn    Protocol = C.GPGME_PROTOCOL_SPAWN
 	ProtocolDefault  Protocol = C.GPGME_PROTOCOL_DEFAULT
 	ProtocolUnknown  Protocol = C.GPGME_PROTOCOL_UNKNOWN
 )
@@ -69,7 +68,6 @@ const (
 	EncryptNoEncryptTo EncryptFlag = C.GPGME_ENCRYPT_NO_ENCRYPT_TO
 	EncryptPrepare     EncryptFlag = C.GPGME_ENCRYPT_PREPARE
 	EncryptExceptSign  EncryptFlag = C.GPGME_ENCRYPT_EXPECT_SIGN
-	EncryptNoCompress  EncryptFlag = C.GPGME_ENCRYPT_NO_COMPRESS
 )
 
 type HashAlgo int
@@ -83,7 +81,6 @@ const (
 	KeyListModeExtern       KeyListMode = C.GPGME_KEYLIST_MODE_EXTERN
 	KeyListModeSigs         KeyListMode = C.GPGME_KEYLIST_MODE_SIGS
 	KeyListModeSigNotations KeyListMode = C.GPGME_KEYLIST_MODE_SIG_NOTATIONS
-	KeyListModeWithSecret   KeyListMode = C.GPGME_KEYLIST_MODE_WITH_SECRET
 	KeyListModeEphemeral    KeyListMode = C.GPGME_KEYLIST_MODE_EPHEMERAL
 	KeyListModeModeValidate KeyListMode = C.GPGME_KEYLIST_MODE_VALIDATE
 )
@@ -551,9 +548,6 @@ type ExportModeFlags uint
 const (
 	ExportModeExtern  ExportModeFlags = C.GPGME_EXPORT_MODE_EXTERN
 	ExportModeMinimal ExportModeFlags = C.GPGME_EXPORT_MODE_MINIMAL
-	ExportModeSecret  ExportModeFlags = C.GPGME_EXPORT_MODE_SECRET
-	ExportModeRaw     ExportModeFlags = C.GPGME_EXPORT_MODE_RAW
-	ExportModePKCS12  ExportModeFlags = C.GPGME_EXPORT_MODE_PKCS12
 )
 
 func (c *Context) Export(pattern string, mode ExportModeFlags, data *Data) error {
@@ -817,13 +811,4 @@ func (u *UserID) Comment() string {
 
 func (u *UserID) Email() string {
 	return C.GoString(u.u.email)
-}
-
-// This is somewhat of a horrible hack. We need to unset GPG_AGENT_INFO so that gpgme does not pass --use-agent to GPG.
-// os.Unsetenv should be enough, but that only calls the underlying C library (which gpgme uses) if cgo is involved
-// - and cgo can't be used in tests. So, provide this helper for test initialization.
-func unsetenvGPGAgentInfo() {
-	v := C.CString("GPG_AGENT_INFO")
-	defer C.free(unsafe.Pointer(v))
-	C.unsetenv(v)
 }

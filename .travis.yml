@@ -1,0 +1,34 @@
+---
+language: go
+os:
+  - linux
+  - osx
+  - windows
+dist: trusty
+sudo: false
+
+go:
+  - 1.11
+
+addons:
+  apt:
+    packages:
+    - libgpgme11-dev
+  homebrew:
+    packages:
+    - gnupg
+    - gnupg@1.4
+    - gpgme
+
+matrix:
+  allow_failures:
+    - os: windows
+
+before_install:
+  - if [[ "$TRAVIS_OS_NAME" == "windows" ]]; then choco install msys2 ; fi
+
+install:
+- true #do not execute "go get ./..." as it will fail with the examples
+
+script:
+  - go test -v .
