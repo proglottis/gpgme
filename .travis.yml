@@ -26,6 +26,7 @@ matrix:
 
 before_install:
   - if [[ "$TRAVIS_OS_NAME" == "windows" ]]; then choco install msys2 ; fi
+  - if [[ "$TRAVIS_OS_NAME" == "windows" ]]; then pacman -S mingw-w64-x86_64-gpgme ; fi
 
 install:
 - true #do not execute "go get ./..." as it will fail with the examples
