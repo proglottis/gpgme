@@ -1,6 +1,6 @@
-package gpgme
-
 // +build !windows
+
+package gpgme
 
 // #include <stdlib.h>
 import "C"
