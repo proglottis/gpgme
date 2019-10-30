@@ -4,11 +4,13 @@ os:
   - linux
   - osx
   - windows
-dist: trusty
+dist: xenial
 sudo: false
 
 go:
   - 1.11
+  - 1.12
+  - 1.13
 
 addons:
   apt:
@@ -19,16 +21,12 @@ addons:
     - gnupg
     - gnupg@1.4
     - gpgme
+    update: true
 
 matrix:
   allow_failures:
     - os: windows
 
 before_install:
-  - if [[ "$TRAVIS_OS_NAME" == "windows" ]]; then choco install msys2 ; fi
-
-install:
-- true #do not execute "go get ./..." as it will fail with the examples
-
-script:
-  - go test -v .
+  - if [[ "$TRAVIS_OS_NAME" == "windows" ]]; then choco install msys2; fi
+  - if [[ "$TRAVIS_OS_NAME" == "windows" ]]; then choco install gpg4win; fi
