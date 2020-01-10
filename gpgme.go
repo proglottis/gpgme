@@ -395,11 +395,17 @@ func (c *Context) GetKey(fingerprint string, secret bool) (*Key, error) {
 }
 
 func (c *Context) Decrypt(ciphertext, plaintext *Data) error {
-	return handleError(C.gpgme_op_decrypt(c.ctx, ciphertext.dh, plaintext.dh))
+	err := handleError(C.gpgme_op_decrypt(c.ctx, ciphertext.dh, plaintext.dh))
+	runtime.KeepAlive(ciphertext)
+	runtime.KeepAlive(plaintext)
+	return err
 }
 
 func (c *Context) DecryptVerify(ciphertext, plaintext *Data) error {
-	return handleError(C.gpgme_op_decrypt_verify(c.ctx, ciphertext.dh, plaintext.dh))
+	err := handleError(C.gpgme_op_decrypt_verify(c.ctx, ciphertext.dh, plaintext.dh))
+	runtime.KeepAlive(ciphertext)
+	runtime.KeepAlive(plaintext)
+	return err
 }
 
 type Signature struct {
@@ -426,6 +432,13 @@ func (c *Context) Verify(sig, signedText, plain *Data) (string, []Signature, err
 		plainPtr = plain.dh
 	}
 	err := handleError(C.gpgme_op_verify(c.ctx, sig.dh, signedTextPtr, plainPtr))
+	runtime.KeepAlive(sig)
+	if signedText != nil {
+		runtime.KeepAlive(signedText)
+	}
+	if plain != nil {
+		runtime.KeepAlive(plain)
+	}
 	if err != nil {
 		return "", nil, err
 	}
@@ -461,6 +474,8 @@ func (c *Context) Encrypt(recipients []*Key, flags EncryptFlag, plaintext, ciphe
 		*ptr = recipients[i].k
 	}
 	err := C.gpgme_op_encrypt(c.ctx, (*C.gpgme_key_t)(recp), C.gpgme_encrypt_flags_t(flags), plaintext.dh, ciphertext.dh)
+	runtime.KeepAlive(plaintext)
+	runtime.KeepAlive(ciphertext)
 	return handleError(err)
 }
 
@@ -472,7 +487,10 @@ func (c *Context) Sign(signers []*Key, plain, sig *Data, mode SigMode) error {
 			return err
 		}
 	}
-	return handleError(C.gpgme_op_sign(c.ctx, plain.dh, sig.dh, C.gpgme_sig_mode_t(mode)))
+	err := handleError(C.gpgme_op_sign(c.ctx, plain.dh, sig.dh, C.gpgme_sig_mode_t(mode)))
+	runtime.KeepAlive(plain)
+	runtime.KeepAlive(sig)
+	return err
 }
 
 type AssuanDataCallback func(data []byte) error
@@ -553,7 +571,9 @@ const (
 func (c *Context) Export(pattern string, mode ExportModeFlags, data *Data) error {
 	pat := C.CString(pattern)
 	defer C.free(unsafe.Pointer(pat))
-	return handleError(C.gpgme_op_export(c.ctx, pat, C.gpgme_export_mode_t(mode), data.dh))
+	err := handleError(C.gpgme_op_export(c.ctx, pat, C.gpgme_export_mode_t(mode), data.dh))
+	runtime.KeepAlive(data)
+	return err
 }
 
 // ImportStatusFlags describes the type of ImportStatus.Status. The C API in gpgme.h simply uses "unsigned".
@@ -592,6 +612,7 @@ type ImportResult struct {
 
 func (c *Context) Import(keyData *Data) (*ImportResult, error) {
 	err := handleError(C.gpgme_op_import(c.ctx, keyData.dh))
+	runtime.KeepAlive(keyData)
 	if err != nil {
 		return nil, err
 	}
