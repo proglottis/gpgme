@@ -164,39 +164,60 @@ func EngineCheckVersion(p Protocol) error {
 }
 
 type EngineInfo struct {
-	info C.gpgme_engine_info_t
+	next            *EngineInfo
+	protocol        Protocol
+	fileName        string
+	homeDir         string
+	version         string
+	requiredVersion string
+}
+
+func copyEngineInfo(info C.gpgme_engine_info_t) *EngineInfo {
+	res := &EngineInfo{
+		next:            nil,
+		protocol:        Protocol(info.protocol),
+		fileName:        C.GoString(info.file_name),
+		homeDir:         C.GoString(info.home_dir),
+		version:         C.GoString(info.version),
+		requiredVersion: C.GoString(info.req_version),
+	}
+	if info.next != nil {
+		res.next = copyEngineInfo(info.next)
+	}
+	return res
 }
 
 func (e *EngineInfo) Next() *EngineInfo {
-	if e.info.next == nil {
-		return nil
-	}
-	return &EngineInfo{info: e.info.next}
+	return e.next
 }
 
 func (e *EngineInfo) Protocol() Protocol {
-	return Protocol(e.info.protocol)
+	return e.protocol
 }
 
 func (e *EngineInfo) FileName() string {
-	return C.GoString(e.info.file_name)
+	return e.fileName
 }
 
 func (e *EngineInfo) Version() string {
-	return C.GoString(e.info.version)
+	return e.version
 }
 
 func (e *EngineInfo) RequiredVersion() string {
-	return C.GoString(e.info.req_version)
+	return e.requiredVersion
 }
 
 func (e *EngineInfo) HomeDir() string {
-	return C.GoString(e.info.home_dir)
+	return e.homeDir
 }
 
 func GetEngineInfo() (*EngineInfo, error) {
-	info := &EngineInfo{}
-	return info, handleError(C.gpgme_get_engine_info(&info.info))
+	var cInfo C.gpgme_engine_info_t
+	err := handleError(C.gpgme_get_engine_info(&cInfo))
+	if err != nil {
+		return nil, err
+	}
+	return copyEngineInfo(cInfo), nil // It is up to the caller not to invalidate cInfo concurrently until this is done.
 }
 
 func SetEngineInfo(proto Protocol, fileName, homeDir string) error {
@@ -257,9 +278,9 @@ type Context struct {
 	KeyError error
 
 	callback Callback
-	cbc      uintptr
+	cbc      uintptr // WARNING: Call runtime.KeepAlive(c) after ANY use of c.cbc in C (typically via c.ctx)
 
-	ctx C.gpgme_ctx_t
+	ctx C.gpgme_ctx_t // WARNING: Call runtime.KeepAlive(c) after ANY passing of c.ctx to C
 }
 
 func New() (*Context, error) {
@@ -277,47 +298,66 @@ func (c *Context) Release() {
 		callbackDelete(c.cbc)
 	}
 	C.gpgme_release(c.ctx)
+	runtime.KeepAlive(c)
 	c.ctx = nil
 }
 
 func (c *Context) SetArmor(yes bool) {
 	C.gpgme_set_armor(c.ctx, cbool(yes))
+	runtime.KeepAlive(c)
 }
 
 func (c *Context) Armor() bool {
-	return C.gpgme_get_armor(c.ctx) != 0
+	res := C.gpgme_get_armor(c.ctx) != 0
+	runtime.KeepAlive(c)
+	return res
 }
 
 func (c *Context) SetTextMode(yes bool) {
 	C.gpgme_set_textmode(c.ctx, cbool(yes))
+	runtime.KeepAlive(c)
 }
 
 func (c *Context) TextMode() bool {
-	return C.gpgme_get_textmode(c.ctx) != 0
+	res := C.gpgme_get_textmode(c.ctx) != 0
+	runtime.KeepAlive(c)
+	return res
 }
 
 func (c *Context) SetProtocol(p Protocol) error {
-	return handleError(C.gpgme_set_protocol(c.ctx, C.gpgme_protocol_t(p)))
+	err := handleError(C.gpgme_set_protocol(c.ctx, C.gpgme_protocol_t(p)))
+	runtime.KeepAlive(c)
+	return err
 }
 
 func (c *Context) Protocol() Protocol {
-	return Protocol(C.gpgme_get_protocol(c.ctx))
+	res := Protocol(C.gpgme_get_protocol(c.ctx))
+	runtime.KeepAlive(c)
+	return res
 }
 
 func (c *Context) SetKeyListMode(m KeyListMode) error {
-	return handleError(C.gpgme_set_keylist_mode(c.ctx, C.gpgme_keylist_mode_t(m)))
+	err := handleError(C.gpgme_set_keylist_mode(c.ctx, C.gpgme_keylist_mode_t(m)))
+	runtime.KeepAlive(c)
+	return err
 }
 
 func (c *Context) KeyListMode() KeyListMode {
-	return KeyListMode(C.gpgme_get_keylist_mode(c.ctx))
+	res := KeyListMode(C.gpgme_get_keylist_mode(c.ctx))
+	runtime.KeepAlive(c)
+	return res
 }
 
 func (c *Context) SetPinEntryMode(m PinEntryMode) error {
-	return handleError(C.gpgme_set_pinentry_mode(c.ctx, C.gpgme_pinentry_mode_t(m)))
+	err := handleError(C.gpgme_set_pinentry_mode(c.ctx, C.gpgme_pinentry_mode_t(m)))
+	runtime.KeepAlive(c)
+	return err
 }
 
 func (c *Context) PinEntryMode() PinEntryMode {
-	return PinEntryMode(C.gpgme_get_pinentry_mode(c.ctx))
+	res := PinEntryMode(C.gpgme_get_pinentry_mode(c.ctx))
+	runtime.KeepAlive(c)
+	return res
 }
 
 func (c *Context) SetCallback(callback Callback) error {
@@ -334,11 +374,17 @@ func (c *Context) SetCallback(callback Callback) error {
 		c.cbc = 0
 		_, err = C.gogpgme_set_passphrase_cb(c.ctx, nil, 0)
 	}
+	runtime.KeepAlive(c)
 	return err
 }
 
 func (c *Context) EngineInfo() *EngineInfo {
-	return &EngineInfo{info: C.gpgme_ctx_get_engine_info(c.ctx)}
+	cInfo := C.gpgme_ctx_get_engine_info(c.ctx)
+	runtime.KeepAlive(c)
+	// NOTE: c must be live as long as we are accessing cInfo.
+	res := copyEngineInfo(cInfo)
+	runtime.KeepAlive(c) // for accesses to cInfo
+	return res
 }
 
 func (c *Context) SetEngineInfo(proto Protocol, fileName, homeDir string) error {
@@ -351,19 +397,23 @@ func (c *Context) SetEngineInfo(proto Protocol, fileName, homeDir string) error 
 		chome = C.CString(homeDir)
 		defer C.free(unsafe.Pointer(chome))
 	}
-	return handleError(C.gpgme_ctx_set_engine_info(c.ctx, C.gpgme_protocol_t(proto), cfn, chome))
+	err := handleError(C.gpgme_ctx_set_engine_info(c.ctx, C.gpgme_protocol_t(proto), cfn, chome))
+	runtime.KeepAlive(c)
+	return err
 }
 
 func (c *Context) KeyListStart(pattern string, secretOnly bool) error {
 	cpattern := C.CString(pattern)
 	defer C.free(unsafe.Pointer(cpattern))
-	err := C.gpgme_op_keylist_start(c.ctx, cpattern, cbool(secretOnly))
-	return handleError(err)
+	err := handleError(C.gpgme_op_keylist_start(c.ctx, cpattern, cbool(secretOnly)))
+	runtime.KeepAlive(c)
+	return err
 }
 
 func (c *Context) KeyListNext() bool {
 	c.Key = newKey()
 	err := handleError(C.gpgme_op_keylist_next(c.ctx, &c.Key.k))
+	runtime.KeepAlive(c)
 	if err != nil {
 		if e, ok := err.(Error); ok && e.Code() == ErrorEOF {
 			c.KeyError = nil
@@ -377,7 +427,9 @@ func (c *Context) KeyListNext() bool {
 }
 
 func (c *Context) KeyListEnd() error {
-	return handleError(C.gpgme_op_keylist_end(c.ctx))
+	err := handleError(C.gpgme_op_keylist_end(c.ctx))
+	runtime.KeepAlive(c)
+	return err
 }
 
 func (c *Context) GetKey(fingerprint string, secret bool) (*Key, error) {
@@ -385,6 +437,7 @@ func (c *Context) GetKey(fingerprint string, secret bool) (*Key, error) {
 	cfpr := C.CString(fingerprint)
 	defer C.free(unsafe.Pointer(cfpr))
 	err := handleError(C.gpgme_get_key(c.ctx, cfpr, &key.k, cbool(secret)))
+	runtime.KeepAlive(c)
 	if e, ok := err.(Error); key.k == nil && ok && e.Code() == ErrorEOF {
 		return nil, fmt.Errorf("key %q not found", fingerprint)
 	}
@@ -396,6 +449,7 @@ func (c *Context) GetKey(fingerprint string, secret bool) (*Key, error) {
 
 func (c *Context) Decrypt(ciphertext, plaintext *Data) error {
 	err := handleError(C.gpgme_op_decrypt(c.ctx, ciphertext.dh, plaintext.dh))
+	runtime.KeepAlive(c)
 	runtime.KeepAlive(ciphertext)
 	runtime.KeepAlive(plaintext)
 	return err
@@ -403,6 +457,7 @@ func (c *Context) Decrypt(ciphertext, plaintext *Data) error {
 
 func (c *Context) DecryptVerify(ciphertext, plaintext *Data) error {
 	err := handleError(C.gpgme_op_decrypt_verify(c.ctx, ciphertext.dh, plaintext.dh))
+	runtime.KeepAlive(c)
 	runtime.KeepAlive(ciphertext)
 	runtime.KeepAlive(plaintext)
 	return err
@@ -432,6 +487,7 @@ func (c *Context) Verify(sig, signedText, plain *Data) (string, []Signature, err
 		plainPtr = plain.dh
 	}
 	err := handleError(C.gpgme_op_verify(c.ctx, sig.dh, signedTextPtr, plainPtr))
+	runtime.KeepAlive(c)
 	runtime.KeepAlive(sig)
 	if signedText != nil {
 		runtime.KeepAlive(signedText)
@@ -443,6 +499,8 @@ func (c *Context) Verify(sig, signedText, plain *Data) (string, []Signature, err
 		return "", nil, err
 	}
 	res := C.gpgme_op_verify_result(c.ctx)
+	runtime.KeepAlive(c)
+	// NOTE: c must be live as long as we are accessing res.
 	sigs := []Signature{}
 	for s := res.signatures; s != nil; s = s.next {
 		sig := Signature{
@@ -462,7 +520,9 @@ func (c *Context) Verify(sig, signedText, plain *Data) (string, []Signature, err
 		}
 		sigs = append(sigs, sig)
 	}
-	return C.GoString(res.file_name), sigs, nil
+	fileName := C.GoString(res.file_name)
+	runtime.KeepAlive(c) // for all accesses to res above
+	return fileName, sigs, nil
 }
 
 func (c *Context) Encrypt(recipients []*Key, flags EncryptFlag, plaintext, ciphertext *Data) error {
@@ -474,6 +534,7 @@ func (c *Context) Encrypt(recipients []*Key, flags EncryptFlag, plaintext, ciphe
 		*ptr = recipients[i].k
 	}
 	err := C.gpgme_op_encrypt(c.ctx, (*C.gpgme_key_t)(recp), C.gpgme_encrypt_flags_t(flags), plaintext.dh, ciphertext.dh)
+	runtime.KeepAlive(c)
 	runtime.KeepAlive(plaintext)
 	runtime.KeepAlive(ciphertext)
 	return handleError(err)
@@ -481,13 +542,18 @@ func (c *Context) Encrypt(recipients []*Key, flags EncryptFlag, plaintext, ciphe
 
 func (c *Context) Sign(signers []*Key, plain, sig *Data, mode SigMode) error {
 	C.gpgme_signers_clear(c.ctx)
+	runtime.KeepAlive(c)
 	for _, k := range signers {
-		if err := handleError(C.gpgme_signers_add(c.ctx, k.k)); err != nil {
+		err := handleError(C.gpgme_signers_add(c.ctx, k.k))
+		runtime.KeepAlive(c)
+		if err != nil {
 			C.gpgme_signers_clear(c.ctx)
+			runtime.KeepAlive(c)
 			return err
 		}
 	}
 	err := handleError(C.gpgme_op_sign(c.ctx, plain.dh, sig.dh, C.gpgme_sig_mode_t(mode)))
+	runtime.KeepAlive(c)
 	runtime.KeepAlive(plain)
 	runtime.KeepAlive(sig)
 	return err
@@ -519,6 +585,7 @@ func (c *Context) AssuanSend(
 		C.uintptr_t(statusPtr),
 		&operr,
 	)
+	runtime.KeepAlive(c)
 
 	if handleError(operr) != nil {
 		return handleError(operr)
@@ -572,6 +639,7 @@ func (c *Context) Export(pattern string, mode ExportModeFlags, data *Data) error
 	pat := C.CString(pattern)
 	defer C.free(unsafe.Pointer(pat))
 	err := handleError(C.gpgme_op_export(c.ctx, pat, C.gpgme_export_mode_t(mode), data.dh))
+	runtime.KeepAlive(c)
 	runtime.KeepAlive(data)
 	return err
 }
@@ -612,11 +680,14 @@ type ImportResult struct {
 
 func (c *Context) Import(keyData *Data) (*ImportResult, error) {
 	err := handleError(C.gpgme_op_import(c.ctx, keyData.dh))
+	runtime.KeepAlive(c)
 	runtime.KeepAlive(keyData)
 	if err != nil {
 		return nil, err
 	}
 	res := C.gpgme_op_import_result(c.ctx)
+	runtime.KeepAlive(c)
+	// NOTE: c must be live as long as we are accessing res.
 	imports := []ImportStatus{}
 	for s := res.imports; s != nil; s = s.next {
 		imports = append(imports, ImportStatus{
@@ -625,7 +696,7 @@ func (c *Context) Import(keyData *Data) (*ImportResult, error) {
 			Status:      ImportStatusFlags(s.status),
 		})
 	}
-	return &ImportResult{
+	importResult := &ImportResult{
 		Considered:      int(res.considered),
 		NoUserID:        int(res.no_user_id),
 		Imported:        int(res.imported),
@@ -640,7 +711,9 @@ func (c *Context) Import(keyData *Data) (*ImportResult, error) {
 		SecretUnchanged: int(res.secret_unchanged),
 		NotImported:     int(res.not_imported),
 		Imports:         imports,
-	}, nil
+	}
+	runtime.KeepAlive(c) // for all accesses to res above
+	return importResult, nil
 }
 
 type Key struct {
