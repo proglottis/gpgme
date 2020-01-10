@@ -413,7 +413,7 @@ func (c *Context) KeyListStart(pattern string, secretOnly bool) error {
 func (c *Context) KeyListNext() bool {
 	c.Key = newKey()
 	err := handleError(C.gpgme_op_keylist_next(c.ctx, &c.Key.k))
-	runtime.KeepAlive(c)
+	runtime.KeepAlive(c) // implies runtime.KeepAlive(c.Key)
 	if err != nil {
 		if e, ok := err.(Error); ok && e.Code() == ErrorEOF {
 			c.KeyError = nil
@@ -438,7 +438,10 @@ func (c *Context) GetKey(fingerprint string, secret bool) (*Key, error) {
 	defer C.free(unsafe.Pointer(cfpr))
 	err := handleError(C.gpgme_get_key(c.ctx, cfpr, &key.k, cbool(secret)))
 	runtime.KeepAlive(c)
-	if e, ok := err.(Error); key.k == nil && ok && e.Code() == ErrorEOF {
+	runtime.KeepAlive(key)
+	keyKIsNil := key.k == nil
+	runtime.KeepAlive(key)
+	if e, ok := err.(Error); keyKIsNil && ok && e.Code() == ErrorEOF {
 		return nil, fmt.Errorf("key %q not found", fingerprint)
 	}
 	if err != nil {
@@ -535,6 +538,7 @@ func (c *Context) Encrypt(recipients []*Key, flags EncryptFlag, plaintext, ciphe
 	}
 	err := C.gpgme_op_encrypt(c.ctx, (*C.gpgme_key_t)(recp), C.gpgme_encrypt_flags_t(flags), plaintext.dh, ciphertext.dh)
 	runtime.KeepAlive(c)
+	runtime.KeepAlive(recipients)
 	runtime.KeepAlive(plaintext)
 	runtime.KeepAlive(ciphertext)
 	return handleError(err)
@@ -546,6 +550,7 @@ func (c *Context) Sign(signers []*Key, plain, sig *Data, mode SigMode) error {
 	for _, k := range signers {
 		err := handleError(C.gpgme_signers_add(c.ctx, k.k))
 		runtime.KeepAlive(c)
+		runtime.KeepAlive(k)
 		if err != nil {
 			C.gpgme_signers_clear(c.ctx)
 			runtime.KeepAlive(c)
@@ -717,7 +722,7 @@ func (c *Context) Import(keyData *Data) (*ImportResult, error) {
 }
 
 type Key struct {
-	k C.gpgme_key_t
+	k C.gpgme_key_t // WARNING: Call Runtime.KeepAlive(k) after ANY passing of k.k to C
 }
 
 func newKey() *Key {
@@ -728,85 +733,122 @@ func newKey() *Key {
 
 func (k *Key) Release() {
 	C.gpgme_key_release(k.k)
+	runtime.KeepAlive(k)
 	k.k = nil
 }
 
 func (k *Key) Revoked() bool {
-	return C.key_revoked(k.k) != 0
+	res := C.key_revoked(k.k) != 0
+	runtime.KeepAlive(k)
+	return res
 }
 
 func (k *Key) Expired() bool {
-	return C.key_expired(k.k) != 0
+	res := C.key_expired(k.k) != 0
+	runtime.KeepAlive(k)
+	return res
 }
 
 func (k *Key) Disabled() bool {
-	return C.key_disabled(k.k) != 0
+	res := C.key_disabled(k.k) != 0
+	runtime.KeepAlive(k)
+	return res
 }
 
 func (k *Key) Invalid() bool {
-	return C.key_invalid(k.k) != 0
+	res := C.key_invalid(k.k) != 0
+	runtime.KeepAlive(k)
+	return res
 }
 
 func (k *Key) CanEncrypt() bool {
-	return C.key_can_encrypt(k.k) != 0
+	res := C.key_can_encrypt(k.k) != 0
+	runtime.KeepAlive(k)
+	return res
 }
 
 func (k *Key) CanSign() bool {
-	return C.key_can_sign(k.k) != 0
+	res := C.key_can_sign(k.k) != 0
+	runtime.KeepAlive(k)
+	return res
 }
 
 func (k *Key) CanCertify() bool {
-	return C.key_can_certify(k.k) != 0
+	res := C.key_can_certify(k.k) != 0
+	runtime.KeepAlive(k)
+	return res
 }
 
 func (k *Key) Secret() bool {
-	return C.key_secret(k.k) != 0
+	res := C.key_secret(k.k) != 0
+	runtime.KeepAlive(k)
+	return res
 }
 
 func (k *Key) CanAuthenticate() bool {
-	return C.key_can_authenticate(k.k) != 0
+	res := C.key_can_authenticate(k.k) != 0
+	runtime.KeepAlive(k)
+	return res
 }
 
 func (k *Key) IsQualified() bool {
-	return C.key_is_qualified(k.k) != 0
+	res := C.key_is_qualified(k.k) != 0
+	runtime.KeepAlive(k)
+	return res
 }
 
 func (k *Key) Protocol() Protocol {
-	return Protocol(k.k.protocol)
+	res := Protocol(k.k.protocol)
+	runtime.KeepAlive(k)
+	return res
 }
 
 func (k *Key) IssuerSerial() string {
-	return C.GoString(k.k.issuer_serial)
+	res := C.GoString(k.k.issuer_serial)
+	runtime.KeepAlive(k)
+	return res
 }
 
 func (k *Key) IssuerName() string {
-	return C.GoString(k.k.issuer_name)
+	res := C.GoString(k.k.issuer_name)
+	runtime.KeepAlive(k)
+	return res
 }
 
 func (k *Key) ChainID() string {
-	return C.GoString(k.k.chain_id)
+	res := C.GoString(k.k.chain_id)
+	runtime.KeepAlive(k)
+	return res
 }
 
 func (k *Key) OwnerTrust() Validity {
-	return Validity(k.k.owner_trust)
+	res := Validity(k.k.owner_trust)
+	runtime.KeepAlive(k)
+	return res
 }
 
 func (k *Key) SubKeys() *SubKey {
-	if k.k.subkeys == nil {
+	subKeys := k.k.subkeys
+	runtime.KeepAlive(k)
+	if subKeys == nil {
 		return nil
 	}
-	return &SubKey{k: k.k.subkeys, parent: k}
+	return &SubKey{k: subKeys, parent: k} // The parent: k reference ensures subKeys remains valid
 }
 
 func (k *Key) UserIDs() *UserID {
-	if k.k.uids == nil {
+	uids := k.k.uids
+	runtime.KeepAlive(k)
+	if uids == nil {
 		return nil
 	}
-	return &UserID{u: k.k.uids, parent: k}
+	return &UserID{u: uids, parent: k} // The parent: k reference ensures uids remains valid
 }
 
 func (k *Key) KeyListMode() KeyListMode {
-	return KeyListMode(k.k.keylist_mode)
+	res := KeyListMode(k.k.keylist_mode)
+	runtime.KeepAlive(k)
+	return res
 }
 
 type SubKey struct {
