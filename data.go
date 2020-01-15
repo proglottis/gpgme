@@ -62,13 +62,13 @@ func gogpgme_seekfunc(handle unsafe.Pointer, offset C.gpgme_off_t, whence C.int)
 
 // The Data buffer used to communicate with GPGME
 type Data struct {
-	dh  C.gpgme_data_t
+	dh  C.gpgme_data_t // WARNING: Call runtime.KeepAlive(d) after ANY passing of d.dh to C
 	buf []byte
 	cbs C.struct_gpgme_data_cbs
 	r   io.Reader
 	w   io.Writer
 	s   io.Seeker
-	cbc uintptr
+	cbc uintptr // WARNING: Call runtime.KeepAlive(d) after ANY use of d.cbc in C (typically via d.dh)
 }
 
 func newData() *Data {
@@ -154,12 +154,14 @@ func (d *Data) Close() error {
 		callbackDelete(d.cbc)
 	}
 	_, err := C.gpgme_data_release(d.dh)
+	runtime.KeepAlive(d)
 	d.dh = nil
 	return err
 }
 
 func (d *Data) Write(p []byte) (int, error) {
 	n, err := C.gpgme_data_write(d.dh, unsafe.Pointer(&p[0]), C.size_t(len(p)))
+	runtime.KeepAlive(d)
 	if err != nil {
 		return 0, err
 	}
@@ -171,6 +173,7 @@ func (d *Data) Write(p []byte) (int, error) {
 
 func (d *Data) Read(p []byte) (int, error) {
 	n, err := C.gpgme_data_read(d.dh, unsafe.Pointer(&p[0]), C.size_t(len(p)))
+	runtime.KeepAlive(d)
 	if err != nil {
 		return 0, err
 	}
@@ -182,10 +185,13 @@ func (d *Data) Read(p []byte) (int, error) {
 
 func (d *Data) Seek(offset int64, whence int) (int64, error) {
 	n, err := C.gogpgme_data_seek(d.dh, C.gpgme_off_t(offset), C.int(whence))
+	runtime.KeepAlive(d)
 	return int64(n), err
 }
 
 // Name returns the associated filename if any
 func (d *Data) Name() string {
-	return C.GoString(C.gpgme_data_get_file_name(d.dh))
+	res := C.GoString(C.gpgme_data_get_file_name(d.dh))
+	runtime.KeepAlive(d)
+	return res
 }
