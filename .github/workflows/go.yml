@@ -1,0 +1,29 @@
+name: Test
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - run: sudo apt-get install -y libgpgme-dev
+      - uses: actions/setup-go@v3
+        with:
+          go-version: '1.11.13'
+      - run: go test -v ./...
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+      - run: brew install gpgme gnupg@1.4
+      - uses: actions/setup-go@v3
+        with:
+          go-version: '1.11.13'
+      - run: go test -v ./...
