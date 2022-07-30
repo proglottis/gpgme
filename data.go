@@ -28,17 +28,11 @@ var dataCallbacks = C.struct_gpgme_data_cbs{
 //export gogpgme_readfunc
 func gogpgme_readfunc(handle, buffer unsafe.Pointer, size C.size_t) C.ssize_t {
 	d := callbackLookup(uintptr(handle)).(*Data)
-	if len(d.buf) < int(size) {
-		d.buf = make([]byte, size)
-	}
-	n, err := d.r.Read(d.buf[:size])
+	n, err := d.r.Read(unsafe.Slice((*byte)(buffer), size))
 	if err != nil && err != io.EOF {
 		d.err = err
 		C.gpgme_err_set_errno(C.EIO)
 		return -1
-	}
-	if n > 0 {
-		C.memcpy(buffer, unsafe.Pointer(&d.buf[0]), C.size_t(n))
 	}
 	return C.ssize_t(n)
 }
@@ -46,13 +40,7 @@ func gogpgme_readfunc(handle, buffer unsafe.Pointer, size C.size_t) C.ssize_t {
 //export gogpgme_writefunc
 func gogpgme_writefunc(handle, buffer unsafe.Pointer, size C.size_t) C.ssize_t {
 	d := callbackLookup(uintptr(handle)).(*Data)
-	if len(d.buf) < int(size) {
-		d.buf = make([]byte, size)
-	}
-	if size > 0 {
-		C.memcpy(unsafe.Pointer(&d.buf[0]), buffer, size)
-	}
-	n, err := d.w.Write(d.buf[:size])
+	n, err := d.w.Write(unsafe.Slice((*byte)(buffer), size))
 	if err != nil && err != io.EOF {
 		d.err = err
 		C.gpgme_err_set_errno(C.EIO)
@@ -76,7 +64,6 @@ func gogpgme_seekfunc(handle unsafe.Pointer, offset C.gpgme_off_t, whence C.int)
 // The Data buffer used to communicate with GPGME
 type Data struct {
 	dh  C.gpgme_data_t // WARNING: Call runtime.KeepAlive(d) after ANY passing of d.dh to C
-	buf []byte
 	r   io.Reader
 	w   io.Writer
 	s   io.Seeker
