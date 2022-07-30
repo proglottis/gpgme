@@ -40,7 +40,7 @@ func gogpgme_writefunc(handle, buffer unsafe.Pointer, size C.size_t) C.ssize_t {
 	if len(d.buf) < int(size) {
 		d.buf = make([]byte, size)
 	}
-	C.memcpy(unsafe.Pointer(&d.buf[0]), buffer, C.size_t(size))
+	C.memcpy(unsafe.Pointer(&d.buf[0]), buffer, size)
 	n, err := d.w.Write(d.buf[:size])
 	if err != nil && err != io.EOF {
 		C.gpgme_err_set_errno(C.EIO)

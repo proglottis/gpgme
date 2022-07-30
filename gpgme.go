@@ -243,7 +243,7 @@ func FindKeys(pattern string, secretOnly bool) ([]*Key, error) {
 	if err := ctx.KeyListStart(pattern, secretOnly); err != nil {
 		return keys, err
 	}
-	defer ctx.KeyListEnd()
+	defer func() { _ = ctx.KeyListEnd() }()
 	for ctx.KeyListNext() {
 		keys = append(keys, ctx.Key)
 	}
@@ -268,8 +268,10 @@ func Decrypt(r io.Reader) (*Data, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = ctx.Decrypt(cipher, plain)
-	plain.Seek(0, SeekSet)
+	if err := ctx.Decrypt(cipher, plain); err != nil {
+		return nil, err
+	}
+	_, err = plain.Seek(0, SeekSet)
 	return plain, err
 }
 
@@ -604,7 +606,9 @@ func gogpgme_assuan_data_callback(handle unsafe.Pointer, data unsafe.Pointer, da
 	if *c == nil {
 		return 0
 	}
-	(*c)(C.GoBytes(data, C.int(datalen)))
+	if err := (*c)(C.GoBytes(data, C.int(datalen))); err != nil {
+		return C.gpgme_error(C.GPG_ERR_USER_1)
+	}
 	return 0
 }
 
@@ -616,7 +620,9 @@ func gogpgme_assuan_inquiry_callback(handle unsafe.Pointer, cName *C.char, cArgs
 	if *c == nil {
 		return 0
 	}
-	(*c)(name, args)
+	if err := (*c)(name, args); err != nil {
+		return C.gpgme_error(C.GPG_ERR_USER_1)
+	}
 	return 0
 }
 
@@ -628,7 +634,9 @@ func gogpgme_assuan_status_callback(handle unsafe.Pointer, cStatus *C.char, cArg
 	if *c == nil {
 		return 0
 	}
-	(*c)(status, args)
+	if err := (*c)(status, args); err != nil {
+		return C.gpgme_error(C.GPG_ERR_USER_1)
+	}
 	return 0
 }
 
