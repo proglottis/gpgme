@@ -88,7 +88,7 @@ func compareEngineInfo(t *testing.T, info *EngineInfo, proto Protocol, fileName,
 func TestEngineInfo(t *testing.T) {
 	testProto := ProtocolOpenPGP // Careful, this is global state!
 	defer func() {
-		SetEngineInfo(testProto, "", "") // Try to reset to defaults after we are done.
+		_ = SetEngineInfo(testProto, "", "") // Try to reset to defaults after we are done.
 	}()
 
 	testFN := "testFN"
@@ -337,7 +337,7 @@ func TestContext_Export(t *testing.T) {
 	err = ctx.Export("", 0, data)
 	checkError(t, err)
 
-	data.Seek(0, 0)
+	_, _ = data.Seek(0, 0)
 	allKeys, err := ioutil.ReadAll(data)
 	checkError(t, err)
 	if len(allKeys) < 1 {
@@ -423,7 +423,7 @@ func ensureVersion(t testing.TB, version, msg string) {
 	t.Skip(msg)
 }
 
-func diff(t *testing.T, dst, src []byte) {
+func diff(t testing.TB, dst, src []byte) {
 	t.Helper()
 	line := 1
 	offs := 0 // line offset

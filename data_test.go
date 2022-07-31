@@ -2,91 +2,157 @@ package gpgme
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"io/ioutil"
 	"os"
 	"testing"
 )
 
-func TestNewData(t *testing.T) {
+func TestData_memory_empty(t *testing.T) {
 	dh, err := NewData()
 	checkError(t, err)
+
 	for i := 0; i < 5; i++ {
-		_, err := dh.Write([]byte(testData))
+		_, err := dh.Write([]byte(testCipherText))
 		checkError(t, err)
 	}
+
 	_, err = dh.Seek(0, SeekSet)
 	checkError(t, err)
 
-	var buf bytes.Buffer
-	_, err = io.Copy(&buf, dh)
-	checkError(t, err)
-	expected := bytes.Repeat([]byte(testData), 5)
-	diff(t, buf.Bytes(), expected)
+	testReader(t, dh, bytes.Repeat([]byte(testCipherText), 5))
 
-	dh.Close()
+	checkError(t, dh.Close())
 }
 
-func TestNewDataBytes(t *testing.T) {
+func TestData_memory(t *testing.T) {
 	// Test ordinary data, and empty slices
-	for _, content := range [][]byte{[]byte("content"), []byte{}} {
+	for _, content := range [][]byte{[]byte(testCipherText), []byte{}} {
 		dh, err := NewDataBytes(content)
 		checkError(t, err)
 
-		_, err = dh.Seek(0, SeekSet)
-		checkError(t, err)
-		var buf bytes.Buffer
-		_, err = io.Copy(&buf, dh)
-		checkError(t, err)
-		diff(t, buf.Bytes(), content)
+		testReader(t, dh, content)
+
+		checkError(t, dh.Close())
 	}
 }
 
-func TestDataNewDataFile(t *testing.T) {
+func TestData_file(t *testing.T) {
 	f, err := ioutil.TempFile("", "gpgme")
 	checkError(t, err)
 	defer func() {
-		f.Close()
-		os.Remove(f.Name())
+		checkError(t, f.Close())
+		checkError(t, os.Remove(f.Name()))
 	}()
+
 	dh, err := NewDataFile(f)
 	checkError(t, err)
-	defer dh.Close()
+
 	for i := 0; i < 5; i++ {
-		_, err := dh.Write([]byte(testData))
+		_, err := dh.Write([]byte(testCipherText))
 		checkError(t, err)
 	}
+
 	_, err = dh.Seek(0, SeekSet)
 	checkError(t, err)
-	var buf bytes.Buffer
-	_, err = io.Copy(&buf, dh)
-	checkError(t, err)
-	expected := bytes.Repeat([]byte(testData), 5)
-	diff(t, buf.Bytes(), expected)
+
+	testReader(t, dh, bytes.Repeat([]byte(testCipherText), 5))
+
+	checkError(t, dh.Close())
 }
 
-func TestDataNewDataReader(t *testing.T) {
-	r := bytes.NewReader([]byte(testData))
+func TestData_callback_reading(t *testing.T) {
+	r := bytes.NewReader([]byte(testCipherText))
 	dh, err := NewDataReader(r)
 	checkError(t, err)
-	var buf bytes.Buffer
-	_, err = io.Copy(&buf, dh)
-	checkError(t, err)
-	diff(t, buf.Bytes(), []byte(testData))
 
-	dh.Close()
+	testReader(t, dh, []byte(testCipherText))
+
+	checkError(t, dh.Close())
 }
 
-func TestDataNewDataWriter(t *testing.T) {
+func TestData_callback_reading_error(t *testing.T) {
+	expectedErr := errors.New("a special error")
+	r := errReadSeeker{err: expectedErr}
+	dh, err := NewDataReader(r)
+	checkError(t, err)
+
+	_, err = dh.Read(make([]byte, 10))
+	if err != expectedErr {
+		t.Errorf("err = %v, want %v", err, expectedErr)
+	}
+
+	checkError(t, dh.Close())
+}
+
+func TestData_callback_seeking_error(t *testing.T) {
+	expectedErr := errors.New("a special error")
+	r := errReadSeeker{err: expectedErr}
+	dh, err := NewDataReader(r)
+	checkError(t, err)
+
+	_, err = dh.Seek(0, 0)
+	if err != expectedErr {
+		t.Errorf("err = %v, want %v", err, expectedErr)
+	}
+
+	checkError(t, dh.Close())
+}
+
+func TestData_callback_writing(t *testing.T) {
 	var buf bytes.Buffer
 	dh, err := NewDataWriter(&buf)
 	checkError(t, err)
+
 	for i := 0; i < 5; i++ {
-		_, err := dh.Write([]byte(testData))
+		_, err := dh.Write([]byte(testCipherText))
 		checkError(t, err)
 	}
-	expected := bytes.Repeat([]byte(testData), 5)
+
+	expected := bytes.Repeat([]byte(testCipherText), 5)
 	diff(t, buf.Bytes(), expected)
 
-	dh.Close()
+	checkError(t, dh.Close())
+}
+
+func TestData_callback_writing_error(t *testing.T) {
+	expectedErr := errors.New("a special error")
+	dh, err := NewDataWriter(errWriter{err: expectedErr})
+	checkError(t, err)
+
+	_, err = dh.Write([]byte(testData))
+	if err != expectedErr {
+		t.Errorf("err = %v, want %v", err, expectedErr)
+	}
+
+	checkError(t, dh.Close())
+}
+
+func testReader(t testing.TB, r io.Reader, content []byte) {
+	var buf bytes.Buffer
+	n, err := io.Copy(&buf, r)
+	checkError(t, err)
+
+	if int(n) != len(content) {
+		t.Errorf("n = %d, want %d", n, len(content))
+	}
+
+	diff(t, buf.Bytes(), content)
+}
+
+type errWriter struct{ err error }
+
+func (w errWriter) Write(p []byte) (int, error) {
+	return 0, w.err
+}
+
+type errReadSeeker struct{ err error }
+
+func (rs errReadSeeker) Read([]byte) (int, error) {
+	return 0, rs.err
+}
+
+func (rs errReadSeeker) Seek(int64, int) (int64, error) {
+	return 0, rs.err
 }
