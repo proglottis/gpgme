@@ -99,6 +99,7 @@ func NewData() (*Data, error) {
 // NewDataFile returns a new file based data buffer
 func NewDataFile(f *os.File) (*Data, error) {
 	d := newData()
+	d.r = f
 	return d, handleError(C.gpgme_data_new_from_fd(&d.dh, C.int(f.Fd())))
 }
 
