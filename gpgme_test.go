@@ -423,7 +423,7 @@ func ensureVersion(t testing.TB, version, msg string) {
 	t.Skip(msg)
 }
 
-func diff(t *testing.T, dst, src []byte) {
+func diff(t testing.TB, dst, src []byte) {
 	t.Helper()
 	line := 1
 	offs := 0 // line offset
