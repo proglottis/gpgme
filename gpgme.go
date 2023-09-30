@@ -7,6 +7,7 @@ package gpgme
 // #include <gpgme.h>
 // #include "go_gpgme.h"
 import "C"
+
 import (
 	"fmt"
 	"io"
@@ -233,6 +234,12 @@ func SetEngineInfo(proto Protocol, fileName, homeDir string) error {
 		defer C.free(unsafe.Pointer(chome))
 	}
 	return handleError(C.gpgme_set_engine_info(C.gpgme_protocol_t(proto), cfn, chome))
+}
+
+func GetDirInfo(what string) string {
+	cwhat := C.CString(what)
+	defer C.free(unsafe.Pointer(cwhat))
+	return C.GoString(C.gpgme_get_dirinfo(cwhat))
 }
 
 func FindKeys(pattern string, secretOnly bool) ([]*Key, error) {
@@ -567,9 +574,11 @@ func (c *Context) Sign(signers []*Key, plain, sig *Data, mode SigMode) error {
 	return err
 }
 
-type AssuanDataCallback func(data []byte) error
-type AssuanInquireCallback func(name, args string) error
-type AssuanStatusCallback func(status, args string) error
+type (
+	AssuanDataCallback    func(data []byte) error
+	AssuanInquireCallback func(name, args string) error
+	AssuanStatusCallback  func(status, args string) error
+)
 
 // AssuanSend sends a raw Assuan command to gpg-agent
 func (c *Context) AssuanSend(
