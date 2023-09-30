@@ -105,6 +105,18 @@ func TestEngineInfo(t *testing.T) {
 	checkError(t, SetEngineInfo(testProto, "", testHomeDir))
 }
 
+func TestGetDirInfo(t *testing.T) {
+	info := GetDirInfo("fail")
+	if info != "" {
+		t.Errorf("expected no info, got: %q", info)
+	}
+
+	info = GetDirInfo("homedir")
+	if info == "" {
+		t.Error("expected dir info, got nothing")
+	}
+}
+
 func ctxWithCallback(t *testing.T) *Context {
 	ensureVersion(t, "1.", "can only set password callback for GPG v1.x")
 
