@@ -12,6 +12,7 @@ import (
 	"io"
 	"os"
 	"runtime"
+	"runtime/cgo"
 	"time"
 	"unsafe"
 )
@@ -27,7 +28,8 @@ type Callback func(uidHint string, prevWasBad bool, f *os.File) error
 
 //export gogpgme_passfunc
 func gogpgme_passfunc(hook unsafe.Pointer, uid_hint, passphrase_info *C.char, prev_was_bad, fd C.int) C.gpgme_error_t {
-	c := callbackLookup(uintptr(hook)).(*Context)
+	h := *(*cgo.Handle)(hook)
+	c := h.Value().(*Context)
 	go_uid_hint := C.GoString(uid_hint)
 	f := os.NewFile(uintptr(fd), go_uid_hint)
 	defer f.Close()
@@ -280,7 +282,7 @@ type Context struct {
 	KeyError error
 
 	callback Callback
-	cbc      uintptr // WARNING: Call runtime.KeepAlive(c) after ANY use of c.cbc in C (typically via c.ctx)
+	cbc      cgo.Handle // WARNING: Call runtime.KeepAlive(c) after ANY use of c.cbc in C (typically via c.ctx)
 
 	ctx C.gpgme_ctx_t // WARNING: Call runtime.KeepAlive(c) after ANY passing of c.ctx to C
 }
@@ -297,7 +299,7 @@ func (c *Context) Release() {
 		return
 	}
 	if c.cbc > 0 {
-		callbackDelete(c.cbc)
+		c.cbc.Delete()
 	}
 	C.gpgme_release(c.ctx)
 	runtime.KeepAlive(c)
@@ -366,15 +368,14 @@ func (c *Context) SetCallback(callback Callback) error {
 	var err error
 	c.callback = callback
 	if c.cbc > 0 {
-		callbackDelete(c.cbc)
+		c.cbc.Delete()
 	}
 	if callback != nil {
-		cbc := callbackAdd(c)
-		c.cbc = cbc
-		_, err = C.gogpgme_set_passphrase_cb(c.ctx, C.gpgme_passphrase_cb_t(C.gogpgme_passfunc), C.uintptr_t(cbc))
+		c.cbc = cgo.NewHandle(c)
+		_, err = C.gpgme_set_passphrase_cb(c.ctx, C.gpgme_passphrase_cb_t(C.gogpgme_passfunc), unsafe.Pointer(&c.cbc))
 	} else {
 		c.cbc = 0
-		_, err = C.gogpgme_set_passphrase_cb(c.ctx, nil, 0)
+		_, err = C.gpgme_set_passphrase_cb(c.ctx, nil, nil)
 	}
 	runtime.KeepAlive(c)
 	return err
@@ -579,17 +580,17 @@ func (c *Context) AssuanSend(
 ) error {
 	var operr C.gpgme_error_t
 
-	dataPtr := callbackAdd(&data)
-	inquiryPtr := callbackAdd(&inquiry)
-	statusPtr := callbackAdd(&status)
+	dataPtr := cgo.NewHandle(&data)
+	inquiryPtr := cgo.NewHandle(&inquiry)
+	statusPtr := cgo.NewHandle(&status)
 	cmdCStr := C.CString(cmd)
 	defer C.free(unsafe.Pointer(cmdCStr))
 	err := C.gogpgme_op_assuan_transact_ext(
 		c.ctx,
 		cmdCStr,
-		C.uintptr_t(dataPtr),
-		C.uintptr_t(inquiryPtr),
-		C.uintptr_t(statusPtr),
+		unsafe.Pointer(&dataPtr),
+		unsafe.Pointer(&inquiryPtr),
+		unsafe.Pointer(&statusPtr),
 		&operr,
 	)
 	runtime.KeepAlive(c)
@@ -602,7 +603,8 @@ func (c *Context) AssuanSend(
 
 //export gogpgme_assuan_data_callback
 func gogpgme_assuan_data_callback(handle unsafe.Pointer, data unsafe.Pointer, datalen C.size_t) C.gpgme_error_t {
-	c := callbackLookup(uintptr(handle)).(*AssuanDataCallback)
+	h := *(*cgo.Handle)(handle)
+	c := h.Value().(*AssuanDataCallback)
 	if *c == nil {
 		return 0
 	}
@@ -616,7 +618,8 @@ func gogpgme_assuan_data_callback(handle unsafe.Pointer, data unsafe.Pointer, da
 func gogpgme_assuan_inquiry_callback(handle unsafe.Pointer, cName *C.char, cArgs *C.char) C.gpgme_error_t {
 	name := C.GoString(cName)
 	args := C.GoString(cArgs)
-	c := callbackLookup(uintptr(handle)).(*AssuanInquireCallback)
+	h := *(*cgo.Handle)(handle)
+	c := h.Value().(*AssuanInquireCallback)
 	if *c == nil {
 		return 0
 	}
@@ -630,7 +633,8 @@ func gogpgme_assuan_inquiry_callback(handle unsafe.Pointer, cName *C.char, cArgs
 func gogpgme_assuan_status_callback(handle unsafe.Pointer, cStatus *C.char, cArgs *C.char) C.gpgme_error_t {
 	status := C.GoString(cStatus)
 	args := C.GoString(cArgs)
-	c := callbackLookup(uintptr(handle)).(*AssuanStatusCallback)
+	h := *(*cgo.Handle)(handle)
+	c := h.Value().(*AssuanStatusCallback)
 	if *c == nil {
 		return 0
 	}
