@@ -236,10 +236,14 @@ func SetEngineInfo(proto Protocol, fileName, homeDir string) error {
 	return handleError(C.gpgme_set_engine_info(C.gpgme_protocol_t(proto), cfn, chome))
 }
 
-func GetDirInfo(what string) string {
+func GetDirInfo(what string) (string, error) {
 	cwhat := C.CString(what)
 	defer C.free(unsafe.Pointer(cwhat))
-	return C.GoString(C.gpgme_get_dirinfo(cwhat))
+	cdir := C.gpgme_get_dirinfo(cwhat)
+	if cdir != nil {
+		return C.GoString(cdir), nil
+	}
+	return "", fmt.Errorf("Could not get dirinfo on %s", what)
 }
 
 func FindKeys(pattern string, secretOnly bool) ([]*Key, error) {
