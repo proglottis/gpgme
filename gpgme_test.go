@@ -99,6 +99,14 @@ func TestEngineInfo(t *testing.T) {
 	checkError(t, err)
 	compareEngineInfo(t, info, testProto, testFN, testHomeDir)
 
+	_, err = GetDirInfo("fail")
+	if err == nil {
+		t.Fatal("GetDirInfo should fail on non-exsistent paths")
+	}
+
+	_, err = GetDirInfo("homedir")
+	checkError(t, err)
+
 	// SetEngineInfo with empty strings works, using defaults which we don't know,
 	// so just test that it doesn't fail.
 	checkError(t, SetEngineInfo(testProto, testFN, ""))
