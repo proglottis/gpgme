@@ -22,8 +22,8 @@ jobs:
   ubuntu-ppe64le:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: uraimo/run-on-arch-action@v2
+      - uses: actions/checkout@v4
+      - uses: uraimo/run-on-arch-action@v3
         with:
           arch: ppc64le
           distro: ubuntu_latest
