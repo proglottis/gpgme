@@ -252,8 +252,7 @@ func TestContext_Verify(t *testing.T) {
 	signed, err := NewDataBytes([]byte(testSignedText))
 	checkError(t, err)
 
-	var buf bytes.Buffer
-	plain, err := NewDataWriter(&buf)
+	plain, err := NewData()
 	checkError(t, err)
 
 	_, sigs, err := ctx.Verify(signed, nil, plain)
@@ -282,7 +281,13 @@ func TestContext_Verify(t *testing.T) {
 		t.Errorf("Signature verification does not match: %#v vs. %#v", sig, expectedSig)
 	}
 
-	diff(t, buf.Bytes(), []byte("Test message\n"))
+	_, err = plain.Seek(0, SeekSet)
+	checkError(t, err)
+
+	plainData, err := io.ReadAll(plain)
+	checkError(t, err)
+
+	diff(t, plainData, []byte("Test message\n"))
 }
 
 func TestContext_Import(t *testing.T) {

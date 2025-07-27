@@ -497,28 +497,27 @@ type Signature struct {
 }
 
 func (c *Context) Verify(sig, signedText, plain *Data) (string, []Signature, error) {
+	var pinner runtime.Pinner
+	pinner.Pin(unsafe.Pointer(c))
+	pinner.Pin(unsafe.Pointer(sig))
+
 	var signedTextPtr, plainPtr C.gpgme_data_t = nil, nil
 	if signedText != nil {
 		signedTextPtr = signedText.dh
+		pinner.Pin(unsafe.Pointer(signedText))
 	}
 	if plain != nil {
 		plainPtr = plain.dh
+		pinner.Pin(unsafe.Pointer(plain))
 	}
+
+	defer pinner.Unpin()
+
 	err := handleError(C.gpgme_op_verify(c.ctx, sig.dh, signedTextPtr, plainPtr))
-	runtime.KeepAlive(c)
-	runtime.KeepAlive(sig)
-	if signedText != nil {
-		runtime.KeepAlive(signedText)
-	}
-	if plain != nil {
-		runtime.KeepAlive(plain)
-	}
 	if err != nil {
 		return "", nil, err
 	}
 	res := C.gpgme_op_verify_result(c.ctx)
-	runtime.KeepAlive(c)
-	// NOTE: c must be live as long as we are accessing res.
 	sigs := []Signature{}
 	for s := res.signatures; s != nil; s = s.next {
 		sig := Signature{
@@ -539,7 +538,6 @@ func (c *Context) Verify(sig, signedText, plain *Data) (string, []Signature, err
 		sigs = append(sigs, sig)
 	}
 	fileName := C.GoString(res.file_name)
-	runtime.KeepAlive(c) // for all accesses to res above
 	return fileName, sigs, nil
 }
 
