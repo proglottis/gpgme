@@ -282,6 +282,9 @@ func TestContext_Verify(t *testing.T) {
 		t.Errorf("Signature verification does not match: %#v vs. %#v", sig, expectedSig)
 	}
 
+	checkError(t, plain.Close())
+	ctx.Release()
+
 	diff(t, buf.Bytes(), []byte("Test message\n"))
 }
 
