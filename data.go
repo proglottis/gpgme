@@ -156,10 +156,10 @@ func (d *Data) Close() error {
 	if d.cbc > 0 {
 		d.cbc.Delete()
 	}
-	_, err := C.gpgme_data_release(d.dh)
+	C.gpgme_data_release(d.dh)
 	runtime.KeepAlive(d)
 	d.dh = nil
-	return err
+	return nil
 }
 
 func (d *Data) Write(p []byte) (int, error) {
