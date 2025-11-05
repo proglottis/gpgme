@@ -175,7 +175,7 @@ func (d *Data) Write(p []byte) (int, error) {
 		defer func() { d.err = nil }()
 
 		return 0, d.err
-	case err != nil:
+	case n < 0:
 		return 0, err
 	case len(p) > 0 && n == 0:
 		return 0, io.EOF
@@ -196,7 +196,7 @@ func (d *Data) Read(p []byte) (int, error) {
 		defer func() { d.err = nil }()
 
 		return 0, d.err
-	case err != nil:
+	case n < 0:
 		return 0, err
 	case len(p) > 0 && n == 0:
 		return 0, io.EOF
@@ -212,7 +212,7 @@ func (d *Data) Seek(offset int64, whence int) (int64, error) {
 		defer func() { d.err = nil }()
 
 		return 0, d.err
-	case err != nil:
+	case n < 0:
 		return 0, err
 	}
 	return int64(n), nil
