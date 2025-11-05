@@ -246,8 +246,14 @@ func TestContext_Verify(t *testing.T) {
 	ctx, err := New()
 	checkError(t, err)
 
-	_, err = ctx.GetKey("test@example.com", false)
+	key, err := ctx.GetKey("test@example.com", false)
 	checkError(t, err)
+	if key == nil {
+		t.Fatal("Expected key, got nil")
+	}
+	if key.Fingerprint() != "44B646DC347C31E867FF4F450327FFB0229F6136" {
+		t.Fatalf("Unexpected fingerprint %q", key.Fingerprint())
+	}
 
 	signed, err := NewDataBytes([]byte(testSignedText))
 	checkError(t, err)

@@ -11,6 +11,7 @@ import (
 	"os"
 	"runtime"
 	"runtime/cgo"
+	"strings"
 	"unsafe"
 )
 
@@ -45,6 +46,9 @@ func gogpgme_writefunc(handle, buffer unsafe.Pointer, size C.size_t) C.ssize_t {
 	d := h.Value().(*Data)
 	n, err := d.w.Write(unsafe.Slice((*byte)(buffer), size))
 	if err != nil && err != io.EOF {
+		if !strings.Contains(err.Error(), "a special error") {
+			panic("UNEXPECTED WRITE ERROR: " + err.Error())
+		}
 		d.err = err
 		C.gpgme_err_set_errno(C.EIO)
 		return -1
