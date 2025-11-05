@@ -465,6 +465,8 @@ func (c *Context) GetKey(fingerprint string, secret bool) (*Key, error) {
 }
 
 func (c *Context) Decrypt(ciphertext, plaintext *Data) error {
+	runtime.LockOSThread() // See the comment in the definition of Data
+	defer runtime.UnlockOSThread()
 	err := handleError(C.gpgme_op_decrypt(c.ctx, ciphertext.dh, plaintext.dh))
 	runtime.KeepAlive(c)
 	runtime.KeepAlive(ciphertext)
@@ -473,6 +475,8 @@ func (c *Context) Decrypt(ciphertext, plaintext *Data) error {
 }
 
 func (c *Context) DecryptVerify(ciphertext, plaintext *Data) error {
+	runtime.LockOSThread() // See the comment in the definition of Data
+	defer runtime.UnlockOSThread()
 	err := handleError(C.gpgme_op_decrypt_verify(c.ctx, ciphertext.dh, plaintext.dh))
 	runtime.KeepAlive(c)
 	runtime.KeepAlive(ciphertext)
@@ -503,6 +507,8 @@ func (c *Context) Verify(sig, signedText, plain *Data) (string, []Signature, err
 	if plain != nil {
 		plainPtr = plain.dh
 	}
+	runtime.LockOSThread() // See the comment in the definition of Data
+	defer runtime.UnlockOSThread()
 	err := handleError(C.gpgme_op_verify(c.ctx, sig.dh, signedTextPtr, plainPtr))
 	runtime.KeepAlive(c)
 	runtime.KeepAlive(sig)
@@ -550,6 +556,8 @@ func (c *Context) Encrypt(recipients []*Key, flags EncryptFlag, plaintext, ciphe
 		ptr := (*C.gpgme_key_t)(unsafe.Pointer(uintptr(recp) + size*uintptr(i)))
 		*ptr = recipients[i].k
 	}
+	runtime.LockOSThread() // See the comment in the definition of Data
+	defer runtime.UnlockOSThread()
 	err := C.gpgme_op_encrypt(c.ctx, (*C.gpgme_key_t)(recp), C.gpgme_encrypt_flags_t(flags), plaintext.dh, ciphertext.dh)
 	runtime.KeepAlive(c)
 	runtime.KeepAlive(recipients)
@@ -571,6 +579,8 @@ func (c *Context) Sign(signers []*Key, plain, sig *Data, mode SigMode) error {
 			return err
 		}
 	}
+	runtime.LockOSThread() // See the comment in the definition of Data
+	defer runtime.UnlockOSThread()
 	err := handleError(C.gpgme_op_sign(c.ctx, plain.dh, sig.dh, C.gpgme_sig_mode_t(mode)))
 	runtime.KeepAlive(c)
 	runtime.KeepAlive(plain)
@@ -668,6 +678,8 @@ const (
 func (c *Context) Export(pattern string, mode ExportModeFlags, data *Data) error {
 	pat := C.CString(pattern)
 	defer C.free(unsafe.Pointer(pat))
+	runtime.LockOSThread() // See the comment in the definition of Data
+	defer runtime.UnlockOSThread()
 	err := handleError(C.gpgme_op_export(c.ctx, pat, C.gpgme_export_mode_t(mode), data.dh))
 	runtime.KeepAlive(c)
 	runtime.KeepAlive(data)
@@ -709,6 +721,8 @@ type ImportResult struct {
 }
 
 func (c *Context) Import(keyData *Data) (*ImportResult, error) {
+	runtime.LockOSThread() // See the comment in the definition of Data
+	defer runtime.UnlockOSThread()
 	err := handleError(C.gpgme_op_import(c.ctx, keyData.dh))
 	runtime.KeepAlive(c)
 	runtime.KeepAlive(keyData)

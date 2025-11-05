@@ -33,7 +33,7 @@ func gogpgme_readfunc(handle, buffer unsafe.Pointer, size C.size_t) C.ssize_t {
 	n, err := d.r.Read(unsafe.Slice((*byte)(buffer), size))
 	if err != nil && err != io.EOF {
 		d.err = err
-		C.gpgme_err_set_errno(C.EIO)
+		C.gpgme_err_set_errno(C.EIO) // NOTE: This uses thread-local data, and thus is only safe within runtime.LockOSThread().
 		return -1
 	}
 	return C.ssize_t(n)
@@ -46,7 +46,7 @@ func gogpgme_writefunc(handle, buffer unsafe.Pointer, size C.size_t) C.ssize_t {
 	n, err := d.w.Write(unsafe.Slice((*byte)(buffer), size))
 	if err != nil && err != io.EOF {
 		d.err = err
-		C.gpgme_err_set_errno(C.EIO)
+		C.gpgme_err_set_errno(C.EIO) // NOTE: This uses thread-local data, and thus is only safe within runtime.LockOSThread().
 		return -1
 	}
 	return C.ssize_t(n)
@@ -59,7 +59,7 @@ func gogpgme_seekfunc(handle unsafe.Pointer, offset C.gpgme_off_t, whence C.int)
 	n, err := d.s.Seek(int64(offset), int(whence))
 	if err != nil {
 		d.err = err
-		C.gpgme_err_set_errno(C.EIO)
+		C.gpgme_err_set_errno(C.EIO) // NOTE: This uses thread-local data, and thus is only safe within runtime.LockOSThread().
 		return -1
 	}
 	return C.gpgme_off_t(n)
@@ -67,7 +67,10 @@ func gogpgme_seekfunc(handle unsafe.Pointer, offset C.gpgme_off_t, whence C.int)
 
 // The Data buffer used to communicate with GPGME
 type Data struct {
-	dh  C.gpgme_data_t // WARNING: Call runtime.KeepAlive(d) after ANY passing of d.dh to C
+	// WARNING:
+	// - Any use of d.dh that might come from gpgme_data_new_from_cbs MUST be within runtime.LockOSThread()
+	// - Call runtime.KeepAlive(d) after ANY passing of d.dh to C
+	dh  C.gpgme_data_t
 	r   io.Reader
 	w   io.Writer
 	s   io.Seeker
@@ -172,7 +175,12 @@ func (d *Data) Write(p []byte) (int, error) {
 			buffer = &remaining[0]
 		}
 
-		n, err := C.gpgme_data_write(d.dh, unsafe.Pointer(buffer), C.size_t(len(remaining)))
+		n, err := func() (C.ssize_t, error) { // A scope for defer
+			runtime.LockOSThread() // See the comment in the definition of Data
+			defer runtime.UnlockOSThread()
+			n, err := C.gpgme_data_write(d.dh, unsafe.Pointer(buffer), C.size_t(len(remaining)))
+			return n, err
+		}()
 		runtime.KeepAlive(d)
 		switch {
 		case d.err != nil:
@@ -196,6 +204,8 @@ func (d *Data) Read(p []byte) (int, error) {
 		buffer = &p[0]
 	}
 
+	runtime.LockOSThread() // See the comment in the definition of Data
+	defer runtime.UnlockOSThread()
 	n, err := C.gpgme_data_read(d.dh, unsafe.Pointer(buffer), C.size_t(len(p)))
 	runtime.KeepAlive(d)
 	switch {
@@ -212,7 +222,9 @@ func (d *Data) Read(p []byte) (int, error) {
 }
 
 func (d *Data) Seek(offset int64, whence int) (int64, error) {
-	n, err := C.gogpgme_data_seek(d.dh, C.gpgme_off_t(offset), C.int(whence))
+	runtime.LockOSThread() // See the comment in the definition of Data
+	defer runtime.UnlockOSThread()
+	n, err := C.gpgme_data_seek(d.dh, C.gpgme_off_t(offset), C.int(whence))
 	runtime.KeepAlive(d)
 	switch {
 	case d.err != nil:
