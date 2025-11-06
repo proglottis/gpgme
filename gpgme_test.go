@@ -118,9 +118,11 @@ func TestGetDirInfo(t *testing.T) {
 }
 
 func ctxWithCallback(t *testing.T) *Context {
-	ensureVersion(t, "1.", "can only set password callback for GPG v1.x")
+	//ensureVersion(t, "1.", "can only set password callback for GPG v1.x")
 
 	ctx, err := New()
+	checkError(t, err)
+	ctx.SetPinEntryMode(PinEntryLoopback)
 	checkError(t, err)
 
 	checkError(t, ctx.SetCallback(func(uid_hint string, prev_was_bad bool, f *os.File) error {
