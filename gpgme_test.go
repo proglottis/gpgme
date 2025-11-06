@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
@@ -118,9 +117,9 @@ func TestGetDirInfo(t *testing.T) {
 }
 
 func ctxWithCallback(t *testing.T) *Context {
-	ensureVersion(t, "1.", "can only set password callback for GPG v1.x")
-
 	ctx, err := New()
+	checkError(t, err)
+	err = ctx.SetPinEntryMode(PinEntryLoopback)
 	checkError(t, err)
 
 	checkError(t, ctx.SetCallback(func(uid_hint string, prev_was_bad bool, f *os.File) error {
@@ -393,46 +392,6 @@ func TestContext_AssuanSend(t *testing.T) {
 
 	err = ctx.AssuanSend("KILLAGENT", nil, nil, nil)
 	checkError(t, err)
-}
-
-func isVersion(t testing.TB, version string) bool {
-	t.Helper()
-	var info *EngineInfo
-	info, err := GetEngineInfo()
-	checkError(t, err)
-	for info != nil {
-		if info.Protocol() == ProtocolOpenPGP {
-			if strings.Contains(info.FileName(), "gpg") && strings.HasPrefix(info.Version(), version) {
-				return true
-			}
-			return false
-		}
-		info = info.Next()
-	}
-	return false
-}
-
-var gpgBins = []string{"gpg2", "gpg1", "gpg"}
-
-// ensureVersion tries to setup gpgme with a specific version or skip
-func ensureVersion(t testing.TB, version, msg string) {
-	t.Helper()
-	if isVersion(t, version) {
-		return
-	}
-	for _, bin := range gpgBins {
-		path, err := exec.LookPath(bin)
-		if err != nil {
-			continue
-		}
-		if err := SetEngineInfo(ProtocolOpenPGP, path, absTestGPGHome()); err != nil {
-			continue
-		}
-		if isVersion(t, version) {
-			return
-		}
-	}
-	t.Skip(msg)
 }
 
 func diff(t testing.TB, dst, src []byte) {
