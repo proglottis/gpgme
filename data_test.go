@@ -129,8 +129,48 @@ func TestData_callback_writing_error(t *testing.T) {
 	checkError(t, dh.Close())
 }
 
+func TestData_callback_writing_short(t *testing.T) {
+	shortWriter := &invalidShortWriter{maxWrite: 3}
+	dh, err := NewDataWriter(shortWriter)
+	checkError(t, err)
+	defer dh.Close()
+
+	// Write should loop and write all data despite short writes
+	_, err = dh.Write([]byte("test data"))
+	checkError(t, err)
+
+	expected := []byte("test data")
+	diff(t, shortWriter.written, expected)
+}
+
+// invalidShortWriter is an INVALID io.Writer implementation which succeeds with a short write.
+// We use it to simulate gpgme_data_write returning a short write, which is legitimate.
+type invalidShortWriter struct {
+	maxWrite int
+	written  []byte
+}
+
+func (w *invalidShortWriter) Write(p []byte) (int, error) {
+	n := len(p)
+	if n > w.maxWrite {
+		n = w.maxWrite
+	}
+	w.written = append(w.written, p[:n]...)
+	return n, nil
+}
+
 func testReader(t testing.TB, r io.Reader, content []byte) {
 	var buf bytes.Buffer
+
+	// Reading into a 0-byte slice should return n == 0.
+	n1, err := r.Read([]byte{})
+	if n1 != 0 {
+		t.Errorf("Read([]byte{}) = %d", n1)
+	}
+	if len(content) > 0 && err != nil { // Getting io.EOF on 0-byte content is valid.
+		t.Errorf("Read([]byte{}) error %v", err)
+	}
+
 	n, err := io.Copy(&buf, r)
 	checkError(t, err)
 
