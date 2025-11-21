@@ -377,20 +377,19 @@ func (c *Context) PinEntryMode() PinEntryMode {
 }
 
 func (c *Context) SetCallback(callback Callback) error {
-	var err error
 	c.callback = callback
 	if c.cbc > 0 {
 		c.cbc.Delete()
 	}
 	if callback != nil {
 		c.cbc = cgo.NewHandle(c)
-		_, err = C.gpgme_set_passphrase_cb(c.ctx, C.gpgme_passphrase_cb_t(C.gogpgme_passfunc), unsafe.Pointer(&c.cbc))
+		C.gpgme_set_passphrase_cb(c.ctx, C.gpgme_passphrase_cb_t(C.gogpgme_passfunc), unsafe.Pointer(&c.cbc))
 	} else {
 		c.cbc = 0
-		_, err = C.gpgme_set_passphrase_cb(c.ctx, nil, nil)
+		C.gpgme_set_passphrase_cb(c.ctx, nil, nil)
 	}
 	runtime.KeepAlive(c)
-	return err
+	return nil
 }
 
 func (c *Context) EngineInfo() *EngineInfo {
