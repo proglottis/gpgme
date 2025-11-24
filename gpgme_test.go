@@ -68,6 +68,29 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+func TestHandleError(t *testing.T) {
+	// Smoke-test that error reporting, at least, does not crash.
+
+	ctx, err := New()
+	checkError(t, err)
+	// Use a non-existent engine, and a non-existent key, to trigger an error without many side-effects
+	testProto := ProtocolOpenPGP
+	testFN := "/dev/null/this/does/not/exist"
+	testHomeDir := "/dev/null/this/does/not/exist"
+	checkError(t, ctx.SetEngineInfo(testProto, testFN, testHomeDir))
+	plain, err := NewDataBytes([]byte(testData))
+	checkError(t, err)
+	var dest bytes.Buffer
+	sig, err := NewDataWriter(&dest)
+	checkError(t, err)
+	err = ctx.Sign(nil, plain, sig, SigModeNormal)
+	if err == nil {
+		t.Fatal("Expected error, got nil")
+	}
+	_ = err.(Error).Code()
+	_ = err.Error()
+}
+
 func compareEngineInfo(t *testing.T, info *EngineInfo, proto Protocol, fileName, homeDir string) {
 	for info != nil && info.Protocol() != proto {
 		info = info.Next()

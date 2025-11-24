@@ -144,7 +144,16 @@ func (e Error) Code() ErrorCode {
 }
 
 func (e Error) Error() string {
-	return C.GoString(C.gpgme_strerror(e.err))
+	// gpgme_error_t, aka gpg_error_t, is a single 32-bit integer, so it does not include
+	// strings of arbitrary length
+	// (compare https://git.gnupg.org/cgi-bin/gitweb.cgi?p=libgpg-error.git;a=blob;f=src/err-codes.h.in;hb=HEAD ).
+	//
+	// So, a medium-size hard-coded buffer is sufficient.
+	var buf [1024]C.char
+	_ = C.gpgme_strerror_r(e.err, &buf[0], C.size_t(len(buf)))
+	buf[len(buf)-1] = 0 // If gpgme_strerror_r returns ERANGE, the buffer is not guaranteed to be null-terminated
+
+	return C.GoString(&buf[0])
 }
 
 func handleError(err C.gpgme_error_t) error {
